@@ -65,42 +65,51 @@ export function TicTacToeArt({ className }: ArtProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Rock Paper Scissors — a hand flashing the scissors, amber sleeve
+// Rock Paper Scissors — a simplified rounded hand flashing scissors,
+// drawn as one continuous ink outline, flat with only an amber accent
 // ---------------------------------------------------------------------------
 
 export function RockPaperScissorsArt({ className }: ArtProps) {
-  const finger = (d: string) => (
-    <>
-      <path d={d} stroke={INK} strokeWidth={30} strokeLinecap="round" />
-      <path d={d} stroke="#FFFFFF" strokeWidth={20} strokeLinecap="round" />
-    </>
-  );
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      {/* sleeve */}
+      {/* the hand — a single continuous ink outline: two spread fingers (scissors),
+          a thumb on one side, ring + pinky folded on the other. No shading, no fill. */}
       <path
-        d="M 70 236 C 72 202 80 182 100 174 L 140 174 C 160 182 168 202 170 236 Z"
-        fill={AMBER}
+        d="M 98 200
+           C 92 182, 88 164, 84 148
+           C 76 140, 64 138, 58 130
+           C 54 124, 58 116, 66 116
+           C 78 116, 88 120, 98 122
+           C 96 106, 94 88, 94 70
+           C 94 52, 110 42, 118 52
+           C 120 62, 120 80, 120 96
+           C 122 112, 126 126, 135 126
+           C 139 126, 141 110, 141 96
+           C 141 74, 141 58, 141 48
+           C 141 36, 162 34, 166 48
+           C 168 60, 166 84, 164 100
+           C 164 116, 172 126, 178 138
+           C 184 150, 182 164, 180 178
+           C 178 188, 174 196, 170 200
+           C 146 204, 122 204, 98 200
+           Z"
+        fill="none"
         stroke={INK}
-        strokeWidth={4.5}
+        strokeWidth={6}
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M 84 178 C 104 186 136 186 156 178" stroke={AMBER_DEEP} strokeWidth={5} strokeLinecap="round" />
-      {/* palm */}
-      <ellipse cx={120} cy={158} rx={46} ry={42} fill="#FFFFFF" stroke={INK} strokeWidth={4.5} />
-      {/* index + middle fingers (the scissors) */}
-      {finger("M 96 132 C 88 104 82 84 76 56")}
-      {finger("M 144 132 C 152 104 158 84 164 56")}
-      {/* thumb */}
-      {finger("M 84 148 C 66 146 52 140 44 126")}
-      {/* folded ring + pinky */}
-      {finger("M 158 150 C 168 158 174 170 172 182")}
-      {/* motion lines */}
+      {/* motion dashes near the fingertips, matching the sibling icons */}
       <g {...artBase} strokeWidth={5}>
-        <path d="M 58 34 L 50 26" />
-        <path d="M 100 26 L 96 16" />
-        <path d="M 188 36 L 196 28" />
+        <path d="M 72 40 L 60 32" />
+        <path d="M 100 22 L 102 12" />
+        <path d="M 172 22 L 182 16" />
       </g>
+      {/* amber sparkle accent */}
+      <path
+        d="M 196 80 C 197.5 85.5, 199.5 87.5, 205 89 C 199.5 90.5, 197.5 92.5, 196 98 C 194.5 92.5, 192.5 90.5, 187 89 C 192.5 87.5, 194.5 85.5, 196 80 Z"
+        fill={AMBER}
+      />
     </svg>
   );
 }
