@@ -1,16 +1,22 @@
 import { useId } from "react";
 
 // ---------------------------------------------------------------------------
-// Recess illustration set — hand-drawn SVG components in the brand palette.
-// Each takes an optional className so callers control sizing.
+// Recess flat icon set — rounded soft-body shapes in the brand palette.
+//
+// Set rules (kept deliberately strict):
+//   • Ink-black (#1A1A1A) outlines, single consistent stroke weight (5px)
+//   • Warm amber (#F5A623) fills only — no other colors, no gradients
+//   • Subtle soft drop shadow under each shape (shared feDropShadow filter)
+//   • Chunky rounded shapes, generous negative space, centered on the cream
+//     card the caller places them on
+// Each icon takes an optional className so callers control sizing.
 // ---------------------------------------------------------------------------
 
 const INK = "#1A1A1A";
 const AMBER = "#F5A623";
-const AMBER_SOFT = "#F9C877";
-const WOOD = "#C98A1E";
 const CREAM = "#FFF9E5";
-const GOLD = "#E5A222";
+const WOOD = "#C98A1E";
+const STROKE = 5;
 
 interface ArtProps {
   className?: string;
@@ -24,184 +30,214 @@ const artBase = {
   strokeLinejoin: "round" as const,
 };
 
-// ---------------------------------------------------------------------------
-// Tic Tac Toe — 3x3 grid of rounded cells, amber X's and ink O's
-// ---------------------------------------------------------------------------
-
-export function TicTacToeArt({ className }: ArtProps) {
-  const marks = [
-    { x: 48, y: 48, type: "X" },
-    { x: 120, y: 48, type: "O" },
-    { x: 192, y: 48, type: "X" },
-    { x: 48, y: 120, type: "O" },
-    { x: 120, y: 120, type: "X" },
-    { x: 192, y: 120, type: "O" },
-    { x: 48, y: 192, type: "X" },
-    { x: 120, y: 192, type: "O" },
-    { x: 192, y: 192, type: "X" },
-  ];
+/** Shared soft drop shadow — subtle depth, no gradients. Unique id per icon. */
+function DropShadow({ id }: { id: string }) {
   return (
-    <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      <rect x={20} y={20} width={200} height={200} rx={28} fill="#FFFFFF" stroke={INK} strokeWidth={5} />
-      {/* cells */}
-      {[20, 92, 164].map((x) =>
-        [20, 92, 164].map((y) => (
-          <rect key={`${x}-${y}`} x={x} y={y} width={56} height={56} rx={14} fill="#FFFFFF" stroke={INK} strokeWidth={3.5} />
-        )),
-      )}
-      {/* marks */}
-      {marks.map((m, i) =>
-        m.type === "X" ? (
-          <g key={i} stroke={AMBER} strokeWidth={12} strokeLinecap="round">
-            <path d={`M${m.x - 16} ${m.y - 16} C${m.x - 12} ${m.y - 12}, ${m.x + 12} ${m.y + 12}, ${m.x + 16} ${m.y + 16}`} />
-            <path d={`M${m.x + 16} ${m.y - 16} C${m.x + 12} ${m.y - 12}, ${m.x - 12} ${m.y + 12}, ${m.x - 16} ${m.y + 16}`} />
-          </g>
-        ) : (
-          <circle key={i} cx={m.x} cy={m.y} r={17} fill="#FFFFFF" stroke={INK} strokeWidth={11} />
-        ),
-      )}
-    </svg>
+    <filter id={id} x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3.5" floodColor={INK} floodOpacity="0.16" />
+    </filter>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Rock Paper Scissors — minimalist line art: rock, paper, and a scissors hand
-// side by side. Clean 3px ink outlines, rounded caps, warm gold fills.
-// ---------------------------------------------------------------------------
-
-export function RockPaperScissorsArt({ className }: ArtProps) {
+/** A chunky ink question mark — engraved on amber, or solo on cream. */
+function InkQuestionMark({ cx, cy }: { cx: number; cy: number }) {
   return (
-    <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      {/* rock — a warm-gold pebble with a crease */}
+    <>
       <path
-        d="M 24 116 C 24 96 36 86 54 86 C 70 86 80 96 80 112 C 80 128 72 138 56 138 C 38 138 24 132 24 116 Z"
-        fill={GOLD}
+        d={`M ${cx - 14} ${cy - 20} C ${cx - 14} ${cy - 34} ${cx + 14} ${cy - 34} ${cx + 14} ${cy - 20} C ${cx + 14} ${cy - 8} ${cx - 2} ${cy - 5} ${cx - 2} ${cy + 3}`}
         stroke={INK}
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 37 102 C 43 97 51 96 58 99"
-        stroke={INK}
-        strokeWidth={3}
+        strokeWidth={11}
         strokeLinecap="round"
         fill="none"
       />
+      <circle cx={cx} cy={cy + 18} r={7} fill="none" stroke={INK} strokeWidth={11} />
+    </>
+  );
+}
 
-      {/* paper — a note with a gold folded corner */}
-      <path
-        d="M 92 84 L 140 84 L 148 92 L 148 138 L 92 138 Z"
-        fill="#FFFFFF"
-        stroke={INK}
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 140 84 L 140 92 L 148 92 Z"
-        fill={GOLD}
-        stroke={INK}
-        strokeWidth={3}
-        strokeLinejoin="round"
-      />
-      <path d="M 100 104 L 136 104" stroke={INK} strokeWidth={3} strokeLinecap="round" />
-      <path d="M 100 116 L 128 116" stroke={INK} strokeWidth={3} strokeLinecap="round" />
+// ---------------------------------------------------------------------------
+// Tic Tac Toe — a 3x3 grid of rounded cells with X and O marks
+// ---------------------------------------------------------------------------
 
-      {/* scissors — a minimal geometric hand flashing the ✌️ sign */}
-      <ellipse cx={188} cy={131} rx={17} ry={14} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
-      <rect x={173} y={86} width={13} height={33} rx={6.5} fill={GOLD} stroke={INK} strokeWidth={3} />
-      <rect x={190} y={82} width={13} height={37} rx={6.5} fill={GOLD} stroke={INK} strokeWidth={3} />
-      <rect x={163} y={124} width={17} height={10} rx={5} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
-      <rect x={198} y={134} width={10} height={15} rx={5} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
+export function TicTacToeArt({ className }: ArtProps) {
+  const shadowId = useId();
+  const cells = [26, 92, 158];
+  // A game in progress — X, O, X down the diagonal, six cells left open.
+  const marks = [
+    { x: 54, y: 54, type: "X" },
+    { x: 120, y: 120, type: "O" },
+    { x: 186, y: 186, type: "X" },
+  ] as const;
+  return (
+    <svg viewBox="0 0 240 240" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {cells.map((x) =>
+          cells.map((y) => (
+            <rect
+              key={`${x}-${y}`}
+              x={x}
+              y={y}
+              width={56}
+              height={56}
+              rx={18}
+              fill="none"
+              stroke={INK}
+              strokeWidth={STROKE}
+            />
+          )),
+        )}
+        {marks.map((m, i) =>
+          m.type === "X" ? (
+            <g key={i}>
+              <rect
+                x={m.x - 20}
+                y={m.y - 8}
+                width={40}
+                height={16}
+                rx={8}
+                fill={AMBER}
+                stroke={INK}
+                strokeWidth={STROKE}
+                transform={`rotate(45 ${m.x} ${m.y})`}
+              />
+              <rect
+                x={m.x - 20}
+                y={m.y - 8}
+                width={40}
+                height={16}
+                rx={8}
+                fill={AMBER}
+                stroke={INK}
+                strokeWidth={STROKE}
+                transform={`rotate(-45 ${m.x} ${m.y})`}
+              />
+            </g>
+          ) : (
+            <path
+              key={i}
+              d={`M ${m.x - 19} ${m.y} A 19 19 0 1 0 ${m.x + 19} ${m.y} A 19 19 0 1 0 ${m.x - 19} ${m.y} Z M ${m.x - 9} ${m.y} A 9 9 0 1 1 ${m.x + 9} ${m.y} A 9 9 0 1 1 ${m.x - 9} ${m.y} Z`}
+              fill={AMBER}
+              stroke={INK}
+              strokeWidth={STROKE}
+              fillRule="evenodd"
+            />
+          ),
+        )}
+      </g>
     </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Red or Black — a card split amber/ink on the diagonal
+// Rock Paper Scissors — a chubby rounded hand flashing the scissors sign
+// ---------------------------------------------------------------------------
+
+export function RockPaperScissorsArt({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 240 240" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* fingers — two rounded pills, slightly splayed */}
+        <rect x={86} y={54} width={30} height={86} rx={15} fill={AMBER} stroke={INK} strokeWidth={STROKE} transform="rotate(-5 101 140)" />
+        <rect x={124} y={46} width={30} height={94} rx={15} fill={AMBER} stroke={INK} strokeWidth={STROKE} transform="rotate(5 139 140)" />
+        {/* palm — drawn over the finger bases, so the seam reads as a fold */}
+        <rect x={80} y={116} width={80} height={80} rx={36} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* thumb — angled down-out to the right, as in a scissors gesture */}
+        <rect x={150} y={146} width={48} height={24} rx={12} fill={AMBER} stroke={INK} strokeWidth={STROKE} transform="rotate(20 174 158)" />
+        {/* tucked ring + pinky knuckles */}
+        <rect x={140} y={184} width={20} height={16} rx={8} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        <rect x={162} y={190} width={17} height={13} rx={6.5} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* palm creases */}
+        <path d="M 96 138 C 102 134 112 134 118 138" stroke={INK} strokeWidth={STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 122 146 C 128 142 138 142 144 146" stroke={INK} strokeWidth={STROKE} fill="none" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Red or Black — a rounded playing card split diagonally, two pips
 // ---------------------------------------------------------------------------
 
 export function RedOrBlackArt({ className }: ArtProps) {
+  const shadowId = useId();
   const clipId = useId();
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
       <defs>
+        <DropShadow id={shadowId} />
         <clipPath id={clipId}>
-          <rect x={70} y={30} width={100} height={180} rx={18} />
+          <rect x={64} y={34} width={112} height={172} rx={22} />
         </clipPath>
       </defs>
-      <g clipPath={`url(#${clipId})`}>
-        <polygon points="70,30 170,30 70,210" fill={AMBER} />
-        <polygon points="170,30 170,210 70,210" fill={INK} />
-        <path d="M 66 214 L 174 26" stroke={INK} strokeWidth={5} strokeLinecap="round" />
-      </g>
-      <rect x={70} y={30} width={100} height={180} rx={18} fill="none" stroke={INK} strokeWidth={5} />
-      {/* dash marks radiating from the top-right corner */}
-      <g {...artBase} strokeWidth={5}>
-        <path d="M 176 20 L 188 10" />
-        <path d="M 184 30 L 200 30" />
-        <path d="M 172 12 L 172 0" />
-        <path d="M 196 16 L 208 22" />
+      <g filter={`url(#${shadowId})`}>
+        <g clipPath={`url(#${clipId})`}>
+          <polygon points="64,34 176,34 64,206" fill={AMBER} />
+        </g>
+        <rect x={64} y={34} width={112} height={172} rx={22} fill="none" stroke={INK} strokeWidth={STROKE} />
+        <path d="M 170 34 L 70 206" stroke={INK} strokeWidth={STROKE} strokeLinecap="round" />
+        {/* one pip per half — either/or */}
+        <circle cx={90} cy={62} r={7} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        <circle cx={150} cy={178} r={7} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
       </g>
     </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Twenty Questions — a big speech bubble pointing down-left with a "?"
+// Twenty Questions — a chunky speech bubble with a big question mark
 // ---------------------------------------------------------------------------
 
 export function TwentyQuestionsArt({ className }: ArtProps) {
+  const shadowId = useId();
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      {/* tail pointing down-left */}
-      <path d="M 64 158 L 30 198 L 98 176 Z" fill="#FFFFFF" stroke={AMBER} strokeWidth={6} strokeLinejoin="round" />
-      {/* bubble */}
-      <rect x={40} y={36} width={160} height={130} rx={28} fill="#FFFFFF" stroke={AMBER} strokeWidth={6} />
-      {/* question mark */}
-      <path
-        d="M 106 82 C 106 62 136 62 136 82 C 136 96 120 100 120 114"
-        stroke={AMBER}
-        strokeWidth={15}
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx={120} cy={140} r={9} fill={AMBER} />
-      {/* dash marks from the bottom right */}
-      <g {...artBase} strokeWidth={5}>
-        <path d="M 192 150 L 206 142" />
-        <path d="M 200 162 L 216 160" />
-        <path d="M 184 166 L 182 180" />
-        <path d="M 210 172 L 224 170" />
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* tail — points down-left, drawn behind the bubble */}
+        <path d="M 78 168 L 34 212 L 106 190 Z" fill={AMBER} stroke={INK} strokeWidth={STROKE} strokeLinejoin="round" />
+        {/* bubble */}
+        <rect x={40} y={36} width={160} height={134} rx={38} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* engraved question mark */}
+        <InkQuestionMark cx={120} cy={136} />
       </g>
     </svg>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Truth or Dare — a heart bubble and a star bubble, overlapping
+// Truth or Dare — a "?" bubble (truth) and a star bubble (dare), overlapping.
+// No hearts — truth is a question, dare is a star.
 // ---------------------------------------------------------------------------
 
-const STAR_PATH =
-  "M170 58 L175.9 73.9 L192.8 74.6 L179.5 85.1 L184.1 101.4 L170 92 L155.9 101.4 L160.5 85.1 L147.2 74.6 L164.1 73.9 Z";
-
-const HEART_PATH =
-  "M 95 142 C 78 128 58 120 64 102 C 68 90 80 88 88 97 C 92 101 94 105 95 107 C 96 105 98 101 102 97 C 110 88 122 90 126 102 C 132 120 112 128 95 142 Z";
-
 export function TruthOrDareArt({ className }: ArtProps) {
+  const shadowId = useId();
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      {/* left (heart) bubble — offset yellow-orange echo outline */}
-      <rect x={36} y={76} width={130} height={110} rx={24} fill="none" stroke={AMBER_SOFT} strokeWidth={6} />
-      <rect x={30} y={70} width={130} height={110} rx={24} fill="#FFFFFF" stroke={AMBER} strokeWidth={6} />
-      <path d={HEART_PATH} fill={AMBER} />
-      {/* right (star) bubble */}
-      <rect x={118} y={38} width={102} height={88} rx={20} fill="#FFFFFF" stroke={INK} strokeWidth={5} />
-      <path d={STAR_PATH} fill={INK} />
-      {/* dashes above the star bubble */}
-      <g {...artBase} strokeWidth={5}>
-        <path d="M 140 22 L 148 16" />
-        <path d="M 164 18 L 172 12" />
-        <path d="M 190 24 L 200 18" />
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* truth bubble — amber, engraved "?" */}
+        <rect x={30} y={84} width={122} height={102} rx={28} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        <InkQuestionMark cx={91} cy={140} />
+        {/* dare bubble — cream, with a chunky amber star */}
+        <rect x={112} y={36} width={102} height={86} rx={24} fill="none" stroke={INK} strokeWidth={STROKE} />
+        <polygon
+          points="163,52 170.1,68.3 187.7,70 174.4,81.7 178.3,99 163,90 147.7,99 151.6,81.7 138.3,70 156,68.3"
+          fill={AMBER}
+          stroke={INK}
+          strokeWidth={STROKE}
+          strokeLinejoin="round"
+        />
       </g>
     </svg>
   );
@@ -265,24 +301,14 @@ export function SwingSetArt({ className }: ArtProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Hero image — two hands holding phones with hearts, a floating controller
-// square above, linked by dotted curves, sparkles and hearts
+// Hero image — two hands holding phones with game marks on screen, a floating
+// controller square above, linked by dotted curves, sparkles
 // ---------------------------------------------------------------------------
 
 const SPARKLE = (x: number, y: number) => (
   <path
     d={`M ${x} ${y - 9} C ${x + 1.5} ${y - 3.5}, ${x + 3.5} ${y - 1.5}, ${x + 9} ${y} C ${x + 3.5} ${y + 1.5}, ${x + 1.5} ${y + 3.5}, ${x} ${y + 9} C ${x - 1.5} ${y + 3.5}, ${x - 3.5} ${y + 1.5}, ${x - 9} ${y} C ${x - 3.5} ${y - 1.5}, ${x - 1.5} ${y - 3.5}, ${x} ${y - 9} Z`}
     fill={AMBER}
-    stroke={INK}
-    strokeWidth={2.5}
-    strokeLinejoin="round"
-  />
-);
-
-const MINI_HEART = (x: number, y: number, fill: string) => (
-  <path
-    d={`M ${x} ${y + 7} C ${x - 4} ${y + 3}, ${x - 6.5} ${y + 0.5}, ${x - 6.5} ${y - 2.5} C ${x - 6.5} ${y - 5}, ${x - 4.5} ${y - 6}, ${x - 3} ${y - 4.5} C ${x - 1.8} ${y - 3.3}, ${x - 1} ${y - 1.8}, ${x} ${y - 0.5} C ${x + 1} ${y - 1.8}, ${x + 1.8} ${y - 3.3}, ${x + 3} ${y - 4.5} C ${x + 4.5} ${y - 6}, ${x + 6.5} ${y - 5}, ${x + 6.5} ${y - 2.5} C ${x + 6.5} ${y + 0.5}, ${x + 4} ${y + 3}, ${x} ${y + 7} Z`}
-    fill={fill}
     stroke={INK}
     strokeWidth={2.5}
     strokeLinejoin="round"
@@ -307,17 +333,18 @@ export function HeroArt({ className }: ArtProps) {
       <circle cx={172} cy={49} r={2.5} fill={INK} />
       <circle cx={176} cy={55} r={2.5} fill={INK} />
 
-      {/* left phone — dark, held in a hand, heart on the screen */}
+      {/* left phone — dark, held in a hand, an amber X on the screen */}
       <g transform="rotate(-12 95 185)">
         <rect x={75} y={145} width={40} height={80} rx={10} fill={INK} stroke={INK} strokeWidth={4} />
         <rect x={80} y={152} width={30} height={58} rx={5} fill="#2E2A22" />
-        {MINI_HEART(95, 168, "#FFFFFF")}
+        <path d="M 88 161 L 102 175" stroke={AMBER} strokeWidth={4} strokeLinecap="round" />
+        <path d="M 102 161 L 88 175" stroke={AMBER} strokeWidth={4} strokeLinecap="round" />
       </g>
-      {/* right phone — light, held in a hand, heart on the screen */}
+      {/* right phone — light, held in a hand, an ink O on the screen */}
       <g transform="rotate(12 225 185)">
         <rect x={205} y={145} width={40} height={80} rx={10} fill="#FFFFFF" stroke={INK} strokeWidth={4} />
         <rect x={210} y={152} width={30} height={58} rx={5} fill={CREAM} />
-        {MINI_HEART(225, 168, AMBER)}
+        <circle cx={225} cy={168} r={9} fill="none" stroke={INK} strokeWidth={4} />
       </g>
 
       {/* left hand — fingers wrap the dark phone */}
@@ -333,13 +360,13 @@ export function HeroArt({ className }: ArtProps) {
       <path d="M 234 192 L 240 200" stroke={INK} strokeWidth={4.5} strokeLinecap="round" />
       <path d="M 224 190 L 226 198" stroke={INK} strokeWidth={4.5} strokeLinecap="round" />
 
-      {/* sparkles + floating hearts */}
+      {/* sparkles */}
       {SPARKLE(92, 62)}
       {SPARKLE(232, 48)}
       {SPARKLE(282, 108)}
       {SPARKLE(38, 108)}
-      {MINI_HEART(268, 150, AMBER)}
-      {MINI_HEART(48, 148, "#FFFFFF")}
+      {SPARKLE(268, 150)}
+      {SPARKLE(48, 148)}
       <path d="M 122 20 L 130 26" stroke={INK} strokeWidth={3.5} strokeLinecap="round" />
       <path d="M 190 18 L 198 24" stroke={INK} strokeWidth={3.5} strokeLinecap="round" />
     </svg>

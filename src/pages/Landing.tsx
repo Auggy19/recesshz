@@ -289,7 +289,7 @@ export default function Landing() {
             <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
               Ready to play
             </div>
-            <div className="rounded-2xl border border-border bg-white p-3">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
               <TicTacToeArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -319,7 +319,7 @@ export default function Landing() {
             <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
               Ready to play
             </div>
-            <div className="rounded-2xl border border-border bg-[#E2E2DF] p-3">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
               <RockPaperScissorsArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -347,7 +347,7 @@ export default function Landing() {
               key={game.name}
               className="flex flex-col gap-4 rounded-3xl border border-border bg-card/60 p-6 opacity-80 transition-opacity hover:opacity-100"
             >
-              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-white p-3">
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
                 {game.art}
               </div>
               <div>
