@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { SquarePlus, Smartphone } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Smartphone, SquarePlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useA2HS } from "@/hooks/use-a2hs";
@@ -17,9 +17,15 @@ import {
 // InstallPromptModal — "Add Recess to Home Screen".
 //
 // Renders a subtle trigger button plus a bottom-sheet modal with the right
-// instructions per platform:
-//   - Android / Chrome: a native "Install App" button (deferred prompt).
-//   - iOS / Safari: a 2-step visual guide (Share → Add to Home Screen).
+// path per platform:
+//   - installable : Chromium with a captured beforeinstallprompt → native
+//                   "Add to Home Screen" button (the deferred prompt).
+//   - guide       : Chromium where the event can't fire (preview iframe, http
+//                   origin, inactive service worker) → same banner, with the
+//                   browser-menu steps revealed on tap.
+//   - ios         : iOS Safari — a 2-step manual guide (Share → Add to Home
+//                   Screen). iOS has no install event, so we never try to
+//                   auto-trigger anything.
 //
 // Nothing renders at all when the app is already installed, the browser can't
 // install, or the user said "Not now" (hidden for 7 days).
@@ -41,6 +47,17 @@ function IosShareGlyph({ className }: { className?: string }) {
       <rect x="5" y="11" width="14" height="9" rx="2.5" />
       <path d="M12 11V3" />
       <path d="m7 7 5-5 5 5" />
+    </svg>
+  );
+}
+
+/** Chrome's ⋮ overflow-menu glyph. */
+function MenuGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <circle cx="5" cy="12" r="2.1" />
+      <circle cx="12" cy="12" r="2.1" />
+      <circle cx="19" cy="12" r="2.1" />
     </svg>
   );
 }
@@ -83,6 +100,7 @@ export default function InstallPromptModal({
   renderTrigger,
 }: InstallPromptModalProps) {
   const { canShow, status, open, setOpen, install, dismiss } = useA2HS();
+  const [showGuideSteps, setShowGuideSteps] = useState(false);
 
   // Nothing to offer: already installed, unsupported browser, or dismissed.
   if (!canShow) return null;
@@ -137,24 +155,76 @@ export default function InstallPromptModal({
 
           {status === "installable" ? (
             <div className="px-4">
+              <p className="mb-3 text-center text-sm font-bold leading-snug">
+                Keep Recess one tap away.
+              </p>
               <Button
                 type="button"
                 onClick={handleInstall}
                 className="h-12 w-full rounded-full text-base font-bold"
               >
                 <Smartphone className="size-4" />
-                Install App
+                Add to Home Screen
               </Button>
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 One tap — Recess lives on your phone like any other app. No
                 account needed.
               </p>
             </div>
+          ) : status === "guide" ? (
+            <div className="px-4">
+              <p className="mb-3 text-center text-sm font-bold leading-snug">
+                Keep Recess one tap away.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setShowGuideSteps((v) => !v)}
+                className="h-12 w-full rounded-full text-base font-bold"
+              >
+                <Smartphone className="size-4" />
+                Add to Home Screen
+              </Button>
+              {showGuideSteps && (
+                <div className="mt-3 flex flex-col gap-3">
+                  <Step
+                    number={1}
+                    icon={<MenuGlyph className="size-5" />}
+                    title="Open the browser menu"
+                  >
+                    Tap the{" "}
+                    <span className="font-bold text-foreground">⋮ menu</span>{" "}
+                    in the top-right corner of Chrome.
+                  </Step>
+                  <Step
+                    number={2}
+                    icon={<Smartphone className="size-5" />}
+                    title="Install Recess"
+                  >
+                    Tap{" "}
+                    <span className="font-bold text-foreground">
+                      “Install app”
+                    </span>{" "}
+                    (or “Add to Home screen” on desktop).
+                  </Step>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="flex flex-col gap-3 px-4">
-              <Step number={1} icon={<IosShareGlyph className="size-5" />} title="Tap Share">
-                Tap the <span className="font-bold text-foreground">Share button</span> at the
-                bottom of Safari.
+              <p className="rounded-2xl border border-primary/25 bg-primary/10 px-3 py-2.5 text-center text-sm font-semibold leading-snug">
+                Add Recess so we don’t get lost in your chats 👋 Tap the Share
+                icon below, then “Add to Home Screen.”
+              </p>
+              <Step
+                number={1}
+                icon={<IosShareGlyph className="size-5" />}
+                title="Tap Share"
+              >
+                Tap the{" "}
+                <span className="font-bold text-foreground">
+                  Share button
+                </span>{" "}
+                at the bottom of Safari.
               </Step>
               <Step
                 number={2}
@@ -162,7 +232,10 @@ export default function InstallPromptModal({
                 title="Add to Home Screen"
               >
                 Scroll down and tap{" "}
-                <span className="font-bold text-foreground">“Add to Home Screen”</span>.
+                <span className="font-bold text-foreground">
+                  “Add to Home Screen”
+                </span>
+                .
               </Step>
             </div>
           )}

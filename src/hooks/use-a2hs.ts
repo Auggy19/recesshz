@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type A2hsStatus =
   | "idle" // resolving which platform path applies
   | "installable" // Chrome: deferred prompt captured
+  | "guide" // Chromium browser but no prompt event (preview/iframe/offline) — manual menu steps
   | "ios" // iOS Safari in browser mode: show the micro-guide
   | "installed" // already on the home screen (or just installed)
   | "unsupported"; // browser can't install the app
@@ -48,6 +49,16 @@ function isIosSafari(): boolean {
   const isSafari =
     /Safari\//.test(ua) && !/Chrome\/|CriOS|FxiOS|EdgiOS|OPiOS|OPR\//.test(ua);
   return isSafari;
+}
+
+/** Chromium-based browser (Chrome / Edge / Samsung Internet) on a non-iOS
+ *  device. These support install but may never fire `beforeinstallprompt` —
+ *  preview iframes, http origins, or an inactive service worker all suppress
+ *  it. The manual menu guide still applies in those cases. */
+function isChromeLike(): boolean {
+  if (typeof window === "undefined") return false;
+  if (isIosSafari()) return false;
+  return /Chrome\/|Chromium\/|Edg\//.test(window.navigator.userAgent);
 }
 
 function readDismissedUntil(): number | null {
@@ -105,13 +116,17 @@ export function useA2HS() {
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);
 
-    // Browsers that never fire beforeinstallprompt resolve to the iOS guide
-    // or "unsupported" shortly after load (Chrome fires the event within this
-    // window when the criteria are met).
+    // Browsers that never fire beforeinstallprompt resolve shortly after load
+    // (Chrome fires the event within this window when the criteria are met):
+    // iOS gets the Share guide, Chromium gets the manual menu guide, and
+    // anything else is unsupported. If the event arrives late, the listener
+    // above upgrades "guide" → "installable" live.
     const resolveIdle = () => {
       setStatus((s) => {
         if (s !== "idle") return s;
-        return isIosSafari() ? "ios" : "unsupported";
+        if (isIosSafari()) return "ios";
+        if (isChromeLike()) return "guide";
+        return "unsupported";
       });
     };
     const timer = setTimeout(resolveIdle, 2500);
@@ -155,7 +170,7 @@ export function useA2HS() {
     setOpen(false);
   }, []);
 
-  const canInstall = status === "installable" || status === "ios";
+  const canInstall = status === "installable" || status === "guide" || status === "ios";
   const isDismissed = dismissedUntil !== null && dismissedUntil > now;
   const canShow = canInstall && !isDismissed && !isStandalone();
 
