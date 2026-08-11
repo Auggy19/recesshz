@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { OMark, XMark } from "@/components/GameArt";
 
 // ---------------------------------------------------------------------------
 // Tic Tac Toe play area — status line, 3x3 board, and caption. All moves are
@@ -76,7 +77,7 @@ export default function TicTacToePlay({ state, status, myMarker, onMove }: Props
                 onClick={() => onMove(i)}
                 aria-label={`Cell ${i + 1}${cell ? `, ${cell}` : ""}`}
                 className={cn(
-                  "flex aspect-square items-center justify-center rounded-2xl border text-4xl font-black transition-all sm:text-5xl",
+                  "flex aspect-square items-center justify-center rounded-2xl border transition-all",
                   inWinningLine
                     ? "border-primary bg-primary/20"
                     : "border-border bg-card hover:border-primary/60",
@@ -85,15 +86,8 @@ export default function TicTacToePlay({ state, status, myMarker, onMove }: Props
                   disabled && !isWaiting && "cursor-default",
                 )}
               >
-                {cell && (
-                  <span
-                    className={cn(
-                      cell === "X" ? "text-foreground" : "text-primary",
-                    )}
-                  >
-                    {cell}
-                  </span>
-                )}
+                {cell === "X" && <XMark className="h-3/5 w-3/5" />}
+                {cell === "O" && <OMark className="h-3/5 w-3/5" />}
               </button>
             );
           })}

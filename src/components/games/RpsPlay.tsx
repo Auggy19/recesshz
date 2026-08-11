@@ -1,10 +1,19 @@
-import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import {
+  PaperGesture,
+  QuestionMark,
+  RockGesture,
+  RockPaperScissorsArt,
+  type ArtProps,
+} from "@/components/GameArt";
 
 // ---------------------------------------------------------------------------
 // Rock Paper Scissors play area. Both players pick independently; nobody's
 // pick is revealed (server-side) until both have submitted. Best of 3,
-// draws replay the round.
+// draws replay the round. Gestures are the flat ink/amber hand tiles from
+// the icon set — no emoji.
 // ---------------------------------------------------------------------------
 
 type Marker = "X" | "O";
@@ -30,14 +39,23 @@ interface Props {
   onPick: (pick: RpsChoice) => Promise<boolean>;
 }
 
-const CHOICES: { value: RpsChoice; label: string; emoji: string }[] = [
-  { value: "rock", label: "Rock", emoji: "✊" },
-  { value: "paper", label: "Paper", emoji: "✋" },
-  { value: "scissors", label: "Scissors", emoji: "✌️" },
+const CHOICES: { value: RpsChoice; label: string }[] = [
+  { value: "rock", label: "Rock" },
+  { value: "paper", label: "Paper" },
+  { value: "scissors", label: "Scissors" },
 ];
 
-function emoji(pick: RpsChoice | null): string | null {
-  return pick ? (CHOICES.find((c) => c.value === pick)?.emoji ?? null) : null;
+/** Rock and paper have dedicated gesture tiles; scissors reuses the card art's
+ *  two-finger hand so the set stays visually identical. */
+const GESTURES: Record<RpsChoice, (p: ArtProps) => ReactNode> = {
+  rock: (p) => <RockGesture {...p} />,
+  paper: (p) => <PaperGesture {...p} />,
+  scissors: (p) => <RockPaperScissorsArt {...p} />,
+};
+
+function Gesture({ pick, className }: { pick: RpsChoice; className?: string }) {
+  const C = GESTURES[pick];
+  return <C className={className} />;
 }
 
 export default function RpsPlay({ state, status, myMarker, picked, onPick }: Props) {
@@ -146,13 +164,17 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
           // Round resolved — both picks revealed.
           <div className="rounded-3xl border-2 border-border bg-card p-5">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-4">
-                <span className="text-4xl">{emoji(state.picks[myMarker])}</span>
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+                {state.picks[myMarker] && (
+                  <Gesture pick={state.picks[myMarker]} className="h-14 w-14" />
+                )}
                 <span className="text-xs font-bold text-muted-foreground">You</span>
               </div>
               <span className="text-xl font-black text-muted-foreground">vs</span>
-              <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-4">
-                <span className="text-4xl">{emoji(state.picks[opponentMarker])}</span>
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+                {state.picks[opponentMarker] && (
+                  <Gesture pick={state.picks[opponentMarker]} className="h-14 w-14" />
+                )}
                 <span className="text-xs font-bold text-muted-foreground">Friend</span>
               </div>
             </div>
@@ -173,13 +195,17 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
           // My pick is in — show mine, hide theirs until they submit.
           <div className="rounded-3xl border-2 border-dashed border-border bg-card p-5">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-4">
-                <span className="text-4xl">{emoji(myPick) ?? "…"}</span>
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+                {myPick ? (
+                  <Gesture pick={myPick} className="h-14 w-14" />
+                ) : (
+                  <span className="text-4xl font-black text-muted-foreground">…</span>
+                )}
                 <span className="text-xs font-bold text-muted-foreground">You</span>
               </div>
               <span className="text-xl font-black text-muted-foreground">vs</span>
-              <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-4">
-                <span className="animate-bounce text-4xl">❓</span>
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+                <QuestionMark className="h-14 w-14 animate-bounce" />
                 <span className="text-xs font-bold text-muted-foreground">Friend</span>
               </div>
             </div>
@@ -208,7 +234,7 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
                         "cursor-pointer hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md active:scale-95",
                     )}
                   >
-                    <span className="text-4xl sm:text-5xl">{c.emoji}</span>
+                    <Gesture pick={c.value} className="h-14 w-14 sm:h-16 sm:w-16" />
                     <span className="text-xs font-bold">{c.label}</span>
                   </button>
                 );

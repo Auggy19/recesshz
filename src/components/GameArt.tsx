@@ -18,7 +18,7 @@ const CREAM = "#FFF9E5";
 const WOOD = "#C98A1E";
 const STROKE = 5;
 
-interface ArtProps {
+export interface ArtProps {
   className?: string;
 }
 
@@ -126,6 +126,131 @@ export function TicTacToeArt({ className }: ArtProps) {
             />
           ),
         )}
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// X / O marks — used on the live Tic Tac Toe board, matching the card art
+// ---------------------------------------------------------------------------
+
+export function XMark({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 56 56" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        <rect x={8} y={20} width={40} height={16} rx={8} fill={AMBER} stroke={INK} strokeWidth={STROKE} transform="rotate(45 28 28)" />
+        <rect x={8} y={20} width={40} height={16} rx={8} fill={AMBER} stroke={INK} strokeWidth={STROKE} transform="rotate(-45 28 28)" />
+      </g>
+    </svg>
+  );
+}
+
+export function OMark({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 56 56" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        <path
+          d="M 9 28 A 19 19 0 1 0 47 28 A 19 19 0 1 0 9 28 Z M 19 28 A 9 9 0 1 1 37 28 A 9 9 0 1 1 19 28 Z"
+          fill={AMBER}
+          stroke={INK}
+          strokeWidth={STROKE}
+          fillRule="evenodd"
+        />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RPS hand gestures — rock (fist) and paper (open hand); scissors reuses the
+// card art's two-finger hand. Same ink/amber rules, softer 2.5px stroke at the
+// 120-unit tile scale (proportional to the 5px stroke on the 240-unit cards).
+// ---------------------------------------------------------------------------
+
+const GESTURE_STROKE = 2.5;
+
+export function RockGesture({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 120 120" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* knuckles */}
+        <rect x={33} y={14} width={15} height={21} rx={7.5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <rect x={52} y={10} width={15} height={23} rx={7.5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <rect x={71} y={14} width={15} height={21} rx={7.5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        {/* fist body */}
+        <rect x={32} y={34} width={56} height={56} rx={22} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        {/* thumb wrapped across the front */}
+        <rect x={18} y={54} width={30} height={15} rx={7.5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} transform="rotate(-25 33 61.5)" />
+        {/* finger-joint creases */}
+        <path d="M 36 42 C 39 39 43 39 46 42" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 55 40 C 58 37 62 37 65 40" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 74 42 C 77 39 81 39 84 42" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+export function PaperGesture({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 120 120" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* four fingers, staggered tips */}
+        <rect x={46} y={20} width={10} height={36} rx={5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <rect x={59} y={14} width={10} height={42} rx={5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <rect x={72} y={12} width={10} height={44} rx={5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <rect x={85} y={17} width={10} height={39} rx={5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        {/* palm */}
+        <rect x={41} y={50} width={58} height={50} rx={20} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        {/* thumb, angled up-out */}
+        <rect x={29} y={64} width={26} height={13} rx={6.5} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} transform="rotate(15 42 70.5)" />
+        {/* finger-joint creases */}
+        <path d="M 49 38 C 51 35 54 35 56 38" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 62 34 C 64 31 67 31 69 34" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 75 32 C 77 29 80 29 82 32" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+        <path d="M 88 36 C 90 33 93 33 95 36" stroke={INK} strokeWidth={GESTURE_STROKE} fill="none" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Question mark tile — the hidden-pick placeholder on the RPS board
+// ---------------------------------------------------------------------------
+
+export function QuestionMark({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 120 120" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        <rect x={16} y={16} width={88} height={88} rx={26} fill={AMBER} stroke={INK} strokeWidth={GESTURE_STROKE} />
+        <path
+          d="M 60 42 C 60 32 72 30 78 36 C 84 42 82 52 76 56 C 70 60 68 62 68 70"
+          stroke={INK}
+          strokeWidth={6}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <circle cx={68} cy={84} r={4.5} fill={INK} />
       </g>
     </svg>
   );
