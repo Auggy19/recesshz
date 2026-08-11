@@ -27,9 +27,15 @@ import type {
 } from "./schema";
 import {
   GAME_TYPE,
+  RPS_GAME_TYPE,
+  RPS_CHOICES,
+  applyRpsPick,
   applyTicTacToeMove,
+  freshRpsState,
   freshTicTacToeState,
   type Marker,
+  type RpsChoice,
+  type RpsState,
 } from "./gameLogic";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -51,6 +57,29 @@ type ErrorCode =
 
 function fail(code: ErrorCode, message: string): never {
   throw new ConvexError({ code, message });
+}
+
+const SUPPORTED_GAME_TYPES = new Set<string>([GAME_TYPE, RPS_GAME_TYPE]);
+
+function freshStateFor(gameType: string): unknown {
+  switch (gameType) {
+    case GAME_TYPE:
+      return freshTicTacToeState();
+    case RPS_GAME_TYPE:
+      return freshRpsState();
+    default:
+      return fail(
+        "unsupported_game",
+        `Unknown game type \"${gameType}\".`,
+      );
+  }
+}
+
+/** Never reveal a player's pick until both picks are in. */
+function maskRpsState(state: RpsState): RpsState {
+  return state.phase === "picking"
+    ? { ...state, picks: { X: null, O: null } }
+    : state;
 }
 
 function isStale(updatedAt: number): boolean {
@@ -105,10 +134,10 @@ export const createGame = mutation({
     deviceToken: v.string(),
   },
   handler: async (ctx, { gameType, deviceToken }) => {
-    if (gameType !== GAME_TYPE) {
+    if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
-        `"${gameType}" isn't available yet — only ${GAME_TYPE} is supported in this build.`,
+        `"${gameType}" isn't available yet — only Tic Tac Toe and Rock Paper Scissors are supported in this build.`,
       );
     }
     if (!deviceToken || deviceToken.length < 8) {
@@ -123,7 +152,7 @@ export const createGame = mutation({
     const gameId = await ctx.db.insert("games", {
       slug,
       gameType,
-      state: freshTicTacToeState(),
+      state: freshStateFor(gameType),
       status: "waiting" as GameStatus,
       createdAt: now,
       updatedAt: now,
@@ -221,10 +250,22 @@ export const getGameState = query({
       );
     }
 
+    const rpsState =
+      game.gameType === RPS_GAME_TYPE ? (game.state as RpsState) : null;
+
     return {
       status: game.status,
-      state: game.state as TicTacToeState,
-      me: me ? { role: me.role, marker: me.marker } : null,
+      gameType: game.gameType,
+      // RPS picks are masked until both players have submitted this round.
+      state: rpsState ? maskRpsState(rpsState) : game.state,
+      me: me
+        ? {
+            role: me.role,
+            marker: me.marker,
+            // Lets the UI know "you picked" without revealing the pick.
+            picked: rpsState ? rpsState.picks[me.marker] !== null : undefined,
+          }
+        : null,
     };
   },
 });
@@ -237,9 +278,12 @@ export const submitMove = mutation({
   args: {
     slug: v.string(),
     deviceToken: v.string(),
-    cell: v.number(),
+    cell: v.optional(v.number()),
+    pick: v.optional(
+      v.union(v.literal("rock"), v.literal("paper"), v.literal("scissors")),
+    ),
   },
-  handler: async (ctx, { slug, deviceToken, cell }) => {
+  handler: async (ctx, { slug, deviceToken, cell, pick }) => {
     const game = await getGameBySlug(ctx, slug);
     if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
 
@@ -264,8 +308,13 @@ export const submitMove = mutation({
       fail("invalid_move", "This game isn't in progress right now.");
     }
 
+    if (game.gameType === RPS_GAME_TYPE) {
+      return await submitRpsPick(ctx, game, player, pick);
+    }
+
+    // Tic Tac Toe — cell-based move.
     const state = game.state as TicTacToeState;
-    if (!Number.isInteger(cell) || cell < 0 || cell > 8) {
+    if (typeof cell !== "number" || !Number.isInteger(cell) || cell < 0 || cell > 8) {
       fail("invalid_move", "That move is off the board.");
     }
     if (state.winner || state.draw) {
@@ -298,6 +347,51 @@ export const submitMove = mutation({
     return { ok: true, state: outcome.state };
   },
 });
+
+/**
+ * RPS move: record one player's pick. The round only resolves once both picks
+ * exist — until then no pick is ever revealed in the returned state.
+ */
+async function submitRpsPick(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  pick: RpsChoice | undefined,
+) {
+  if (!pick || !RPS_CHOICES.includes(pick)) {
+    fail("invalid_move", "Pick rock, paper, or scissors.");
+  }
+
+  const state = game.state as RpsState;
+  if (state.matchWinner) {
+    fail("invalid_move", "This match is already over.");
+  }
+  if (state.phase === "picking" && state.picks[player.marker] !== null) {
+    fail(
+      "invalid_move",
+      "You already picked this round — wait for your friend.",
+    );
+  }
+
+  const outcome = applyRpsPick(state, player.marker, pick);
+  const now = Date.now();
+
+  await ctx.db.insert("moves", {
+    gameId: game._id,
+    playerId: player._id,
+    payload: { pick, marker: player.marker, round: state.round },
+    createdAt: now,
+  });
+  await ctx.db.patch(game._id, {
+    state: outcome.state,
+    status: outcome.over
+      ? ("completed" as GameStatus)
+      : ("in_progress" as GameStatus),
+    updatedAt: now,
+  });
+
+  return { ok: true, state: maskRpsState(outcome.state) };
+}
 
 // ---------------------------------------------------------------------------
 // Play Again — a fresh game between the same two device tokens
@@ -338,7 +432,7 @@ export const playAgain = mutation({
     const newGameId = await ctx.db.insert("games", {
       slug: newSlug,
       gameType: game.gameType,
-      state: freshTicTacToeState(),
+      state: freshStateFor(game.gameType),
       status: "in_progress" as GameStatus, // both players are already known
       createdAt: now,
       updatedAt: now,
@@ -363,7 +457,7 @@ export const playAgain = mutation({
     // Point the finished game at the rematch so the opponent can follow along.
     await ctx.db.patch(game._id, {
       state: {
-        ...(game.state as TicTacToeState),
+        ...(game.state as object),
         rematch: { slug: newSlug, by: deviceToken },
       },
       updatedAt: now,

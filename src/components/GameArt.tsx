@@ -11,6 +11,7 @@ const AMBER_SOFT = "#F9C877";
 const AMBER_DEEP = "#E8900C";
 const WOOD = "#C98A1E";
 const CREAM = "#FFF9E5";
+const GOLD = "#E5A222";
 
 interface ArtProps {
   className?: string;
@@ -65,51 +66,53 @@ export function TicTacToeArt({ className }: ArtProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Rock Paper Scissors — a simplified rounded hand flashing scissors,
-// drawn as one continuous ink outline, flat with only an amber accent
+// Rock Paper Scissors — minimalist line art: rock, paper, and a scissors hand
+// side by side. Clean 3px ink outlines, rounded caps, warm gold fills.
 // ---------------------------------------------------------------------------
 
 export function RockPaperScissorsArt({ className }: ArtProps) {
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      {/* the hand — a single continuous ink outline: two spread fingers (scissors),
-          a thumb on one side, ring + pinky folded on the other. No shading, no fill. */}
+      {/* rock — a warm-gold pebble with a crease */}
       <path
-        d="M 98 200
-           C 92 182, 88 164, 84 148
-           C 76 140, 64 138, 58 130
-           C 54 124, 58 116, 66 116
-           C 78 116, 88 120, 98 122
-           C 96 106, 94 88, 94 70
-           C 94 52, 110 42, 118 52
-           C 120 62, 120 80, 120 96
-           C 122 112, 126 126, 135 126
-           C 139 126, 141 110, 141 96
-           C 141 74, 141 58, 141 48
-           C 141 36, 162 34, 166 48
-           C 168 60, 166 84, 164 100
-           C 164 116, 172 126, 178 138
-           C 184 150, 182 164, 180 178
-           C 178 188, 174 196, 170 200
-           C 146 204, 122 204, 98 200
-           Z"
-        fill="none"
+        d="M 24 116 C 24 96 36 86 54 86 C 70 86 80 96 80 112 C 80 128 72 138 56 138 C 38 138 24 132 24 116 Z"
+        fill={GOLD}
         stroke={INK}
-        strokeWidth={6}
-        strokeLinecap="round"
+        strokeWidth={3}
         strokeLinejoin="round"
       />
-      {/* motion dashes near the fingertips, matching the sibling icons */}
-      <g {...artBase} strokeWidth={5}>
-        <path d="M 72 40 L 60 32" />
-        <path d="M 100 22 L 102 12" />
-        <path d="M 172 22 L 182 16" />
-      </g>
-      {/* amber sparkle accent */}
       <path
-        d="M 196 80 C 197.5 85.5, 199.5 87.5, 205 89 C 199.5 90.5, 197.5 92.5, 196 98 C 194.5 92.5, 192.5 90.5, 187 89 C 192.5 87.5, 194.5 85.5, 196 80 Z"
-        fill={AMBER}
+        d="M 37 102 C 43 97 51 96 58 99"
+        stroke={INK}
+        strokeWidth={3}
+        strokeLinecap="round"
+        fill="none"
       />
+
+      {/* paper — a note with a gold folded corner */}
+      <path
+        d="M 92 84 L 140 84 L 148 92 L 148 138 L 92 138 Z"
+        fill="#FFFFFF"
+        stroke={INK}
+        strokeWidth={3}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 140 84 L 140 92 L 148 92 Z"
+        fill={GOLD}
+        stroke={INK}
+        strokeWidth={3}
+        strokeLinejoin="round"
+      />
+      <path d="M 100 104 L 136 104" stroke={INK} strokeWidth={3} strokeLinecap="round" />
+      <path d="M 100 116 L 128 116" stroke={INK} strokeWidth={3} strokeLinecap="round" />
+
+      {/* scissors — a minimal geometric hand flashing the ✌️ sign */}
+      <ellipse cx={188} cy={131} rx={17} ry={14} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
+      <rect x={173} y={86} width={13} height={33} rx={6.5} fill={GOLD} stroke={INK} strokeWidth={3} />
+      <rect x={190} y={82} width={13} height={37} rx={6.5} fill={GOLD} stroke={INK} strokeWidth={3} />
+      <rect x={163} y={124} width={17} height={10} rx={5} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
+      <rect x={198} y={134} width={10} height={15} rx={5} fill="#FFFFFF" stroke={INK} strokeWidth={3} />
     </svg>
   );
 }

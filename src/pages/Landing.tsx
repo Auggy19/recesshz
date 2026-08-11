@@ -40,11 +40,6 @@ interface GameCard {
 
 const upcomingGames: GameCard[] = [
   {
-    name: "Rock Paper Scissors",
-    blurb: "Scissors beats paper. Fight me.",
-    art: <RockPaperScissorsArt className="w-full max-w-[92px]" />,
-  },
-  {
     name: "Red or Black",
     blurb: "Pick a color. No — the other one.",
     art: <RedOrBlackArt className="w-full max-w-[92px]" />,
@@ -65,21 +60,18 @@ export default function Landing() {
   const navigate = useNavigate();
   const deviceToken = useDeviceToken();
   const createGame = useMutation(api.games.createGame);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
 
-  const handleCreateGame = async () => {
+  const handleCreateGame = async (gameType: string) => {
     if (creating) return;
-    setCreating(true);
+    setCreating(gameType);
     try {
-      const { slug } = await createGame({
-        gameType: "tic_tac_toe",
-        deviceToken,
-      });
+      const { slug } = await createGame({ gameType, deviceToken });
       navigate(`/play/${slug}`);
     } catch (err) {
       console.error("Failed to create game:", err);
       toast.error("Couldn't start a game right now. Please try again.");
-      setCreating(false);
+      setCreating(null);
     }
   };
 
@@ -157,8 +149,8 @@ export default function Landing() {
           <Button
             size="lg"
             className="h-12 rounded-full px-7 text-base font-bold shadow-lg shadow-primary/25"
-            onClick={handleCreateGame}
-            disabled={creating}
+            onClick={() => handleCreateGame("tic_tac_toe")}
+            disabled={creating !== null}
           >
             {creating ? (
               <>
@@ -210,8 +202,8 @@ export default function Landing() {
           {/* Tic Tac Toe — the live card */}
           <button
             type="button"
-            onClick={handleCreateGame}
-            disabled={creating}
+            onClick={() => handleCreateGame("tic_tac_toe")}
+            disabled={creating !== null}
             className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
           >
             <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
@@ -228,7 +220,39 @@ export default function Landing() {
               </p>
             </div>
             <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
-              {creating ? (
+              {creating === "tic_tac_toe" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
+          {/* Rock Paper Scissors — the second live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("rock_paper_scissors")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Ready to play
+            </div>
+            <div className="rounded-2xl border border-border bg-[#E2E2DF] p-3">
+              <RockPaperScissorsArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">
+                Rock Paper Scissors
+              </h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Best of three. Both of you pick in secret, and the picks only
+                reveal once they&apos;re both in — no peeking, no arguing.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+              {creating === "rock_paper_scissors" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Link2 className="size-4" />

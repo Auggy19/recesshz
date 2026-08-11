@@ -1,10 +1,16 @@
 import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { TicTacToeArt } from "@/components/GameArt";
+import { RockPaperScissorsArt, TicTacToeArt } from "@/components/GameArt";
+import TicTacToePlay, {
+  type Marker,
+  type TicTacToeState,
+} from "@/components/games/TicTacToePlay";
+import RpsPlay, {
+  type RpsChoice,
+} from "@/components/games/RpsPlay";
 import { api } from "@/convex/_generated/api";
 import { useDeviceToken } from "@/hooks/use-device-token";
-import { cn } from "@/lib/utils";
 import {
   useMutation,
   useQuery_experimental as useQuery,
@@ -24,20 +30,19 @@ import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
-// Shared client-side types (mirror the server's TicTacToeState)
+// Shared client-side types (mirror the server shapes)
 // ---------------------------------------------------------------------------
 
-type Marker = "X" | "O";
-type Cell = "" | Marker;
-type Board = Cell[];
 type GameStatus = "waiting" | "in_progress" | "completed" | "abandoned";
+type PlayerRole = "initiator" | "responder";
 
-interface TicTacToeState {
-  board: Board;
-  turn: Marker;
-  winner: Marker | null;
-  draw: boolean;
-  winningLine: number[] | null;
+interface RpsState {
+  round: number;
+  phase: "picking" | "resolved";
+  picks: { X: RpsChoice | null; O: RpsChoice | null };
+  scores: { X: number; O: number };
+  winner: "X" | "O" | "draw" | null;
+  matchWinner: Marker | null;
   rematch?: { slug: string; by: string };
 }
 
@@ -120,7 +125,9 @@ export default function GamePage() {
     "joining",
   );
   const [joinError, setJoinError] = useState<ApiError>({});
-  const [me, setMe] = useState<{ role: "initiator" | "responder"; marker: Marker } | null>(null);
+  const [me, setMe] = useState<{ role: PlayerRole; marker: Marker } | null>(
+    null,
+  );
   const [moveError, setMoveError] = useState<string | null>(null);
   const [feedbackSent, setFeedbackSent] = useState<boolean | null>(null);
   const [creatingRematch, setCreatingRematch] = useState(false);
@@ -156,35 +163,38 @@ export default function GamePage() {
   });
 
   // Fresh link for sharing (also used for the OG preview).
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/play/${slug}` : "";
+  const shareUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/play/${slug}` : "";
 
   const game = query.status === "success" ? query.data : null;
+  const gameType = game?.gameType ?? "tic_tac_toe";
+  const isRps = gameType === "rock_paper_scissors";
   const status: GameStatus | null = game?.status ?? null;
-  const state: TicTacToeState | null = (game?.state as TicTacToeState) ?? null;
+  const state = (game?.state as TicTacToeState) ?? null;
+  const rpsState = (game?.state as RpsState) ?? null;
   const myMarker: Marker | null = game?.me?.marker ?? me?.marker ?? null;
 
-  const isOver = state !== null && (state.winner !== null || state.draw);
-  const isMyTurn =
-    status === "in_progress" &&
-    state !== null &&
-    !isOver &&
-    state.turn === myMarker;
+  const isOver = isRps
+    ? (rpsState?.matchWinner ?? null) !== null
+    : state !== null && (state.winner !== null || state.draw);
+
+  const gameLabel = isRps ? "Rock Paper Scissors" : "Tic Tac Toe";
 
   // Keep the tab title + OG tags fresh for link previews.
   useEffect(() => {
     const invited = status === "waiting";
     document.title = invited
       ? "Recess — you're invited to a game!"
-      : "Recess — Tic Tac Toe";
-    setMetaTag("og:title", "Recess — Tic Tac Toe");
+      : `Recess — ${gameLabel}`;
+    setMetaTag("og:title", `Recess — ${gameLabel}`);
     setMetaTag(
       "og:description",
-      "You've been challenged to a game of Recess. Tap to play — silence is safe here.",
+      `You've been challenged to a game of Recess (${gameLabel}). Tap to play — silence is safe here.`,
     );
     if (typeof window !== "undefined") {
       setMetaTag("og:image", `${window.location.origin}/og-image.png`);
     }
-  }, [status]);
+  }, [status, gameLabel]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
@@ -198,11 +208,21 @@ export default function GamePage() {
   // -------------------------------------------------------------------------
 
   const handleMove = async (cell: number) => {
-    if (!state || !isMyTurn || state.board[cell] !== "") return;
+    if (!state || isOver) return;
     try {
       await submitMove({ slug, deviceToken, cell });
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That move didn't go through.");
+    }
+  };
+
+  const handlePick = async (pick: RpsChoice): Promise<boolean> => {
+    try {
+      await submitMove({ slug, deviceToken, pick });
+      return true;
+    } catch (err) {
+      setMoveError(getApiError(err).message ?? "That pick didn't go through.");
+      return false;
     }
   };
 
@@ -315,13 +335,34 @@ export default function GamePage() {
   // -------------------------------------------------------------------------
 
   const isWaiting = status === "waiting";
-  const resultTitle = state.winner
-    ? state.winner === myMarker
-      ? "You win!"
-      : "Your friend wins"
+
+  const resultTitle = isRps
+    ? rpsState!.matchWinner === myMarker
+      ? "You win the match!"
+      : "Your friend wins the match"
+    : state.winner
+      ? state.winner === myMarker
+        ? "You win!"
+        : "Your friend wins"
+      : "It's a draw";
+
+  const resultSubtitle = isRps
+    ? `Final score — you ${rpsState!.scores[myMarker!]} · friend ${
+        rpsState!.scores[myMarker === "X" ? "O" : "X"]
+      }. ${
+        rpsState!.matchWinner === myMarker
+          ? "Silence never felt so good."
+          : "Rematch? The score is right there."
+      }`
     : state.draw
-      ? "It's a draw"
-      : "";
+      ? "A perfect standoff."
+      : state.winner === myMarker
+        ? "Silence never felt so good."
+        : "Rematch? The board is waiting.";
+
+  // If the opponent started a rematch, offer to follow them; otherwise the
+  // usual Play Again button (which also covers rematches I started myself).
+  const rematch = (isRps ? rpsState?.rematch : state.rematch) ?? null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -339,40 +380,25 @@ export default function GamePage() {
       </header>
 
       <main className="mx-auto w-full max-w-md px-5 pb-16">
-        {/* Status line */}
-        <div className="flex items-center justify-center gap-2 text-center">
-          <span
-            className={cn(
-              "size-2 rounded-full",
-              isMyTurn || isWaiting
-                ? "animate-pulse bg-primary"
-                : "bg-muted-foreground/40",
-            )}
-          />
-          <p className="text-sm font-semibold text-muted-foreground">
-            {isWaiting
-              ? "Waiting for your friend to join…"
-              : isOver
-                ? resultTitle
-                : isMyTurn
-                  ? `Your move — you're ${myMarker}`
-                  : `Waiting for your friend's move…`}
-          </p>
-        </div>
-
         {/* Share card */}
         {isWaiting && (
           <div className="mt-6 rounded-3xl border-2 border-dashed border-primary/50 bg-card p-5">
             <div className="flex items-center gap-3">
               <div className="hidden shrink-0 rounded-xl border border-border bg-white p-2 sm:block">
-                <TicTacToeArt className="w-16" />
+                {isRps ? (
+                  <RockPaperScissorsArt className="w-16" />
+                ) : (
+                  <TicTacToeArt className="w-16" />
+                )}
               </div>
               <div>
                 <h2 className="text-base font-black tracking-tight">
                   Send this link to your friend
                 </h2>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                  You&apos;re X and play first. Your board waits.
+                  {isRps
+                    ? "You're X. Best of three — make your pick when they join."
+                    : "You're X and play first. Your board waits."}
                 </p>
               </div>
             </div>
@@ -413,66 +439,37 @@ export default function GamePage() {
           </p>
         )}
 
-        {/* Board */}
-        <div className={cn("mx-auto mt-6 w-full max-w-xs", isWaiting && "opacity-60")}>
-          <div className="grid grid-cols-3 gap-2">
-            {state.board.map((cell, i) => {
-              const inWinningLine = state.winningLine?.includes(i) ?? false;
-              const disabled =
-                isWaiting || !isMyTurn || cell !== "" || isOver;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => handleMove(i)}
-                  aria-label={`Cell ${i + 1}${cell ? `, ${cell}` : ""}`}
-                  className={cn(
-                    "flex aspect-square items-center justify-center rounded-2xl border text-4xl font-black transition-all sm:text-5xl",
-                    inWinningLine
-                      ? "border-primary bg-primary/20"
-                      : "border-border bg-card hover:border-primary/60",
-                    !disabled && "cursor-pointer hover:-translate-y-0.5 active:scale-95",
-                    disabled && !isWaiting && "cursor-default",
-                  )}
-                >
-                  {cell && (
-                    <span
-                      className={cn(
-                        cell === "X" ? "text-foreground" : "text-primary",
-                      )}
-                    >
-                      {cell}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        {/* Play area */}
+        <div className="mt-6">
+          {isRps ? (
+            <RpsPlay
+              state={rpsState!}
+              status={status}
+              myMarker={myMarker!}
+              picked={game.me?.picked}
+              onPick={handlePick}
+            />
+          ) : (
+            <TicTacToePlay
+              state={state}
+              status={status}
+              myMarker={myMarker!}
+              onMove={handleMove}
+            />
+          )}
         </div>
-
-        <p className="mt-5 text-center text-xs text-muted-foreground">
-          {myMarker === "X" ? "You're X — you go first." : "You're O."}
-          {" "}First to three in a row wins.
-        </p>
 
         {/* Result screen: Play Again + inline feedback */}
         {isOver && status === "completed" && (
           <div className="mt-8 rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
             <h2 className="text-2xl font-black tracking-tight">{resultTitle}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {state.draw
-                ? "A perfect standoff."
-                : state.winner === myMarker
-                  ? "Silence never felt so good."
-                  : "Rematch? The board is waiting."}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{resultSubtitle}</p>
 
-            {/* Rematch offer from the opponent */}
-            {state.rematch && state.rematch.by !== deviceToken ? (
+            {/* Rematch offer from the opponent, else Play Again */}
+            {rematch && rematch.by !== deviceToken ? (
               <Button
                 className="mt-5 w-full rounded-full py-6 text-base font-bold"
-                onClick={() => navigate(`/play/${state.rematch!.slug}`)}
+                onClick={() => navigate(`/play/${rematch.slug}`)}
               >
                 <RefreshCw className="size-4" />
                 Your friend started a rematch — join it
@@ -514,7 +511,9 @@ export default function GamePage() {
                 </div>
               ) : (
                 <p className="mt-3 text-sm font-semibold text-primary">
-                  {feedbackSent ? "Thanks — see you next round!" : "Thanks — noted. 👀"}
+                  {feedbackSent
+                    ? "Thanks — see you next round!"
+                    : "Thanks — noted. 👀"}
                 </p>
               )}
             </div>
