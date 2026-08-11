@@ -1,16 +1,20 @@
 import { useDeviceToken } from "@/hooks/use-device-token";
+import { useStreak } from "@/hooks/use-streak";
 import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  Flame,
   Gamepad2,
   Link2,
   Loader2,
+  LogIn,
   MessageCircle,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Wordmark } from "@/components/Wordmark";
@@ -39,6 +43,31 @@ interface GameCard {
   art: React.ReactNode;
 }
 
+/** Map friendly URL game names (?game=...) to the server game type. */
+function urlGameToType(raw: string | null): string | null {
+  switch (raw) {
+    case "tic-tac-toe":
+    case "tic_tac_toe":
+    case "ttt":
+      return "tic_tac_toe";
+    case "rock-paper-scissors":
+    case "rock_paper_scissors":
+    case "rps":
+      return "rock_paper_scissors";
+    default:
+      return null;
+  }
+}
+
+/** Pull the server's error message out of a ConvexError, if there is one. */
+function apiErrorMessage(err: unknown): string | null {
+  if (err instanceof ConvexError && typeof err.data === "object" && err.data) {
+    const message = (err.data as { message?: string }).message;
+    return message ?? null;
+  }
+  return null;
+}
+
 const upcomingGames: GameCard[] = [
   {
     name: "Red or Black",
@@ -60,21 +89,65 @@ const upcomingGames: GameCard[] = [
 export default function Landing() {
   const navigate = useNavigate();
   const deviceToken = useDeviceToken();
+  const { streak } = useStreak();
   const createGame = useMutation(api.games.createGame);
   const [creating, setCreating] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [roomGame, setRoomGame] = useState<string>("tic_tac_toe");
+  const roomJoinedRef = useRef(false);
 
-  const handleCreateGame = async (gameType: string) => {
+  /** Create-or-join a game; with a room slug both players share one link. */
+  const handleCreateGame = async (gameType: string, roomSlug?: string) => {
     if (creating) return;
     setCreating(gameType);
     try {
-      const { slug } = await createGame({ gameType, deviceToken });
+      const { slug } = await createGame({
+        gameType,
+        deviceToken,
+        ...(roomSlug ? { slug: roomSlug } : {}),
+      });
       navigate(`/play/${slug}`);
     } catch (err) {
       console.error("Failed to create game:", err);
-      toast.error("Couldn't start a game right now. Please try again.");
+      toast.error(
+        apiErrorMessage(err) ??
+          "Couldn't start a game right now. Please try again.",
+      );
       setCreating(null);
     }
   };
+
+  const handleOpenRoom = (e: FormEvent) => {
+    e.preventDefault();
+    const code = roomCode.trim();
+    if (!code) return;
+    void handleCreateGame(roomGame, code);
+  };
+
+  // Instant room creation: opening /?room=XYZ&game=tic-tac-toe joins (or
+  // creates) that room and drops the player straight into the game. Runs once
+  // on mount; create-or-join means both players can open the same room link.
+  useEffect(() => {
+    if (roomJoinedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room");
+    if (!room) return;
+    roomJoinedRef.current = true;
+    const gameType = urlGameToType(params.get("game"));
+    if (!gameType) {
+      toast.error(
+        "That room link doesn't say which game to play — create one instead.",
+      );
+      return;
+    }
+    createGame({ gameType, deviceToken, slug: room })
+      .then(({ slug }) => navigate(`/play/${slug}`))
+      .catch((err) => {
+        console.error("Failed to join room:", err);
+        toast.error(apiErrorMessage(err) ?? "Couldn't open that room right now.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -88,6 +161,12 @@ export default function Landing() {
           >
             How it works
           </a>
+          {streak > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+              <Flame className="size-3.5" />
+              {streak}-day streak
+            </span>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -287,6 +366,71 @@ export default function Landing() {
         </motion.div>
       </section>
 
+      {/* Open a room by code */}
+      <section className="mx-auto w-full max-w-5xl px-5 pb-16">
+        <motion.div
+          {...fadeUp}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col items-center gap-5 rounded-3xl border border-border bg-card p-6 text-center sm:flex-row sm:justify-between sm:text-left sm:p-8"
+        >
+          <div>
+            <h2 className="flex items-center justify-center gap-2 text-lg font-black tracking-tight sm:justify-start">
+              <LogIn className="size-5 text-primary" />
+              Have a room code?
+            </h2>
+            <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              Paste it to jump straight into a game — both of you share the
+              same room link.
+            </p>
+          </div>
+          <form
+            onSubmit={handleOpenRoom}
+            className="flex w-full max-w-md flex-col gap-2 sm:flex-row"
+          >
+            <input
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value)}
+              placeholder="Room code (e.g. sunny-4c)"
+              aria-label="Room code"
+              className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+            />
+            <div className="flex items-center gap-1 rounded-full border border-border bg-background p-1">
+              {(
+                [
+                  ["tic_tac_toe", "Tic Tac Toe"],
+                  ["rock_paper_scissors", "RPS"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setRoomGame(value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    roomGame === value
+                      ? "bg-primary text-white"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="submit"
+              disabled={creating !== null || roomCode.trim().length === 0}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {creating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Open room
+            </button>
+          </form>
+        </motion.div>
+      </section>
+
       {/* Brand mood — the swing set */}
       <section className="mx-auto w-full max-w-5xl px-5 pb-16">
         <motion.div
@@ -304,7 +448,7 @@ export default function Landing() {
             </h2>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
               Recess is built for the slow, quiet, human pace of chat. No
-              timers, no streaks, no pressure — just a link between two people
+              timers, no accounts, no pressure — just a link between two people
               who have other things going on.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold text-muted-foreground">
@@ -314,7 +458,7 @@ export default function Landing() {
               </span>
               <span className="inline-flex items-center gap-2">
                 <span className="size-2 rounded-full bg-primary" />
-                No streaks
+                No accounts
               </span>
               <span className="inline-flex items-center gap-2">
                 <span className="size-2 rounded-full bg-primary" />

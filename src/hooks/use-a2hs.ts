@@ -61,22 +61,26 @@ function readDismissedUntil(): number | null {
 }
 
 export function useA2HS() {
-  const [status, setStatus] = useState<A2hsStatus>(() =>
-    isStandalone() ? "installed" : "idle",
-  );
+  // Initial state covers the two cases that are known before the effect runs:
+  // already installed, or a beforeinstallprompt that fired before mount.
+  const [status, setStatus] = useState<A2hsStatus>(() => {
+    if (isStandalone()) return "installed";
+    if (lastPrompt) return "installable";
+    return "idle";
+  });
   const [open, setOpen] = useState(false);
   const [dismissedUntil, setDismissedUntil] = useState<number | null>(() =>
     readDismissedUntil(),
   );
+  // A minute tick so the 7-day dismissal re-evaluates on its own (and never
+  // calls Date.now() during render).
+  const [now, setNow] = useState(() => Date.now());
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (isStandalone()) {
-      setStatus("installed");
-      return;
-    }
 
+    const tick = setInterval(() => setNow(Date.now()), 60_000);
     const onPrompt = (e: Event) => {
       e.preventDefault(); // suppress Chrome's default mini-infobar
       const prompt = e as BeforeInstallPromptEvent;
@@ -92,10 +96,10 @@ export function useA2HS() {
     };
 
     // Recover a prompt that fired before this hook mounted (e.g. the post-game
-    // screen mounts the prompt late, after the browser already offered it).
+    // screen mounts the prompt late, after the browser already offered it) —
+    // the status itself was seeded from `lastPrompt` in the initializer.
     if (lastPrompt) {
       deferredPrompt.current = lastPrompt;
-      setStatus((s) => (s === "idle" ? "installable" : s));
     }
 
     window.addEventListener("beforeinstallprompt", onPrompt);
@@ -116,6 +120,7 @@ export function useA2HS() {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       clearTimeout(timer);
+      clearInterval(tick);
     };
   }, []);
 
@@ -151,8 +156,7 @@ export function useA2HS() {
   }, []);
 
   const canInstall = status === "installable" || status === "ios";
-  const isDismissed =
-    dismissedUntil !== null && dismissedUntil > Date.now();
+  const isDismissed = dismissedUntil !== null && dismissedUntil > now;
   const canShow = canInstall && !isDismissed && !isStandalone();
 
   return {

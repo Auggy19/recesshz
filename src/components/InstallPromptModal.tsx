@@ -115,7 +115,9 @@ export default function InstallPromptModal({
         </button>
       )}
 
-      <Sheet open={open} onOpenChange={(next) => (next ? setOpen(true) : handleClose())}>
+      {/* Only the explicit "Not now" button hides the prompt for 7 days —
+          closing via the X, the backdrop, or Esc just closes the sheet. */}
+      <Sheet open={open} onOpenChange={(next) => setOpen(!!next)}>
         <SheetContent
           side="bottom"
           className="mx-auto w-full max-w-md rounded-t-3xl border-x border-t pb-[max(1.25rem,env(safe-area-inset-bottom))]"

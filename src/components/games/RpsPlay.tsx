@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Rock Paper Scissors play area. Both players pick independently; nobody's
@@ -43,13 +43,15 @@ function emoji(pick: RpsChoice | null): string | null {
 export default function RpsPlay({ state, status, myMarker, picked, onPick }: Props) {
   // The server masks picks until both are in, so remember my own pick
   // client-side for the "waiting on your friend" view. Reset when a new
-  // round starts (server says I haven't picked).
+  // round starts (server says I haven't picked) — done as a render-time
+  // adjustment, the React-recommended pattern for prop-derived state.
   const [localPick, setLocalPick] = useState<RpsChoice | null>(null);
   const [submitting, setSubmitting] = useState<RpsChoice | null>(null);
-
-  useEffect(() => {
+  const [lastPicked, setLastPicked] = useState(picked);
+  if (lastPicked !== picked) {
+    setLastPicked(picked);
     if (!picked) setLocalPick(null);
-  }, [picked]);
+  }
 
   const isWaiting = status === "waiting";
   const isMatchOver = state.matchWinner !== null;

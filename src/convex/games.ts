@@ -59,7 +59,8 @@ type ErrorCode =
   | "not_a_player"
   | "invalid_move"
   | "not_ready"
-  | "unsupported_game";
+  | "unsupported_game"
+  | "invalid_room";
 
 function fail(code: ErrorCode, message: string): never {
   throw new ConvexError({ code, message });
@@ -76,7 +77,7 @@ function freshStateFor(gameType: string): unknown {
     default:
       return fail(
         "unsupported_game",
-        `Unknown game type \"${gameType}\".`,
+        `Unknown game type "${gameType}".`,
       );
   }
 }
@@ -131,15 +132,25 @@ async function expireIfStale(
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/games — create a game, returns the id used in the share link
+// POST /api/games — create a game, returns the id used in the share link.
+//
+// An optional `slug` supports instant room creation from URL params
+// (?room=XYZ&game=...): if the room already exists and is still alive we
+// return it unchanged (create-or-join — both players can open the same room
+// link), and if it exists but is completed/abandoned we mint a fresh slug so
+// the old one never gets a second game beneath it.
 // ---------------------------------------------------------------------------
+
+/** Room tokens from URL params — short, URL-safe, no collisions with UUIDs. */
+const ROOM_TOKEN_RE = /^[A-Za-z0-9_-]{3,64}$/;
 
 export const createGame = mutation({
   args: {
     gameType: v.string(),
     deviceToken: v.string(),
+    slug: v.optional(v.string()),
   },
-  handler: async (ctx, { gameType, deviceToken }) => {
+  handler: async (ctx, { gameType, deviceToken, slug: requestedSlug }) => {
     if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
@@ -153,8 +164,30 @@ export const createGame = mutation({
       );
     }
 
+    let slug: string;
+    if (requestedSlug) {
+      if (!ROOM_TOKEN_RE.test(requestedSlug)) {
+        fail(
+          "invalid_room",
+          "That room name isn't valid — use 3-64 letters, numbers, dashes or underscores.",
+        );
+      }
+      const existing = await getGameBySlug(ctx, requestedSlug);
+      if (existing) {
+        if (existing.status === "waiting" || existing.status === "in_progress") {
+          // Room already alive — both players share this same link.
+          return { slug: existing.slug };
+        }
+        // Dead room: mint a fresh slug instead of reusing it.
+        slug = crypto.randomUUID();
+      } else {
+        slug = requestedSlug;
+      }
+    } else {
+      slug = crypto.randomUUID();
+    }
+
     const now = Date.now();
-    const slug = crypto.randomUUID();
     const gameId = await ctx.db.insert("games", {
       slug,
       gameType,
@@ -422,7 +455,7 @@ export const playAgain = mutation({
 
     const players = await ctx.db
       .query("players")
-      .withIndex("by_game", (q: any) => q.eq("gameId", game._id))
+      .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .collect();
     if (players.length < 2) {
       fail(
@@ -540,8 +573,8 @@ export const cleanupAbandoned = mutation({
     for (const status of ["waiting", "in_progress"] as const) {
       const stale = await ctx.db
         .query("games")
-        .withIndex("by_status", (q: any) => q.eq("status", status))
-        .filter((q: any) => q.lt(q.field("updatedAt"), cutoff))
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .filter((q) => q.lt(q.field("updatedAt"), cutoff))
         .collect();
       for (const game of stale) {
         await ctx.db.patch(game._id, {

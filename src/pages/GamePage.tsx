@@ -10,8 +10,10 @@ import RpsPlay, {
   type RpsChoice,
 } from "@/components/games/RpsPlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
+import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
 import { useDeviceToken } from "@/hooks/use-device-token";
+import { useStreak } from "@/hooks/use-streak";
 import {
   useMutation,
   useQuery_experimental as useQuery,
@@ -21,12 +23,13 @@ import {
   ArrowLeft,
   Check,
   Copy,
+  Flame,
   Home,
   Loader2,
   MessageCircle,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -169,13 +172,25 @@ export default function GamePage() {
   const [feedbackSent, setFeedbackSent] = useState<boolean | null>(null);
   const [creatingRematch, setCreatingRematch] = useState(false);
 
+  // Daily streak — recorded once per completed game (idempotent per day).
+  const { streak, registerPlay } = useStreak();
+  const streakRecordedRef = useRef(false);
+
+  // Reset join state when the slug changes (e.g. following a rematch link) —
+  // a render-time adjustment, the React-recommended pattern for prop-derived
+  // state, so the effect itself never calls setState synchronously.
+  const [prevSlug, setPrevSlug] = useState(slug);
+  if (prevSlug !== slug) {
+    setPrevSlug(slug);
+    setJoinStatus("joining");
+    setJoinError({});
+  }
+
   // Join (or re-join) the game with this device's token. Idempotent, so
   // re-opening the link or a retry is safe. New devices on a full game are
   // rejected server-side.
   useEffect(() => {
     let cancelled = false;
-    setJoinStatus("joining");
-    setJoinError({});
     (async () => {
       try {
         const res = await joinGame({ slug, deviceToken });
@@ -216,6 +231,19 @@ export default function GamePage() {
     : state !== null && (state.winner !== null || state.draw);
 
   const gameLabel = isRps ? "Rock Paper Scissors" : "Tic Tac Toe";
+
+  // Record the streak exactly once when a game completes — the ref guards
+  // against the reactive query re-delivering the same terminal state, while
+  // registerPlay() itself is idempotent within a local day.
+  useEffect(() => {
+    if (!isOver || status !== "completed") {
+      streakRecordedRef.current = false;
+      return;
+    }
+    if (streakRecordedRef.current) return;
+    streakRecordedRef.current = true;
+    registerPlay();
+  }, [isOver, status, registerPlay]);
 
   // Keep the tab title + OG tags fresh for link previews (WhatsApp, Instagram,
   // browsers re-sharing the link, etc.). Crawlers that don't run JS get their
@@ -505,6 +533,18 @@ export default function GamePage() {
             <h2 className="text-2xl font-black tracking-tight">{resultTitle}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{resultSubtitle}</p>
 
+            {/* Habit banner — a gentle nudge, only after a finished game */}
+            {streak > 0 && (
+              <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-2.5">
+                <Flame className="size-4 shrink-0 text-primary" />
+                <p className="text-sm font-bold text-foreground">
+                  {streak === 1
+                    ? "Day 1 — every game counts."
+                    : `${streak}-day streak — keep the silence going.`}
+                </p>
+              </div>
+            )}
+
             {/* Rematch offer from the opponent, else Play Again */}
             {rematch && rematch.by !== deviceToken ? (
               <Button
@@ -573,6 +613,9 @@ export default function GamePage() {
           </div>
         )}
       </main>
+
+      {/* Floating video overlay — draggable, resizable, PiP-capable */}
+      <FloatingVideo />
     </div>
   );
 }
