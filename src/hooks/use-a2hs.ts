@@ -22,14 +22,14 @@ export type A2hsStatus =
   | "installed" // already on the home screen (or just installed)
   | "unsupported"; // browser can't install the app
 
-const DISMISS_KEY = "recess-a2hs-dismissed-until";
+export const DISMISS_KEY = "recess-a2hs-dismissed-until";
 const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Module-level cache of the last prompt event, so a `beforeinstallprompt`
  *  that fired before React mounted isn't lost. */
 let lastPrompt: BeforeInstallPromptEvent | null = null;
 
-function isStandalone(): boolean {
+export function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia?.("(display-mode: standalone)").matches === true ||
@@ -39,7 +39,7 @@ function isStandalone(): boolean {
 
 /** iOS + Safari (not Chrome/Firefox/Edge wrappers), or iPadOS 13+ which
  *  reports a Mac user agent but has touch input. */
-function isIosSafari(): boolean {
+export function isIosSafari(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent;
   const isIos =
@@ -55,13 +55,13 @@ function isIosSafari(): boolean {
  *  device. These support install but may never fire `beforeinstallprompt` —
  *  preview iframes, http origins, or an inactive service worker all suppress
  *  it. The manual menu guide still applies in those cases. */
-function isChromeLike(): boolean {
+export function isChromeLike(): boolean {
   if (typeof window === "undefined") return false;
   if (isIosSafari()) return false;
   return /Chrome\/|Chromium\/|Edg\//.test(window.navigator.userAgent);
 }
 
-function readDismissedUntil(): number | null {
+export function readDismissedUntil(): number | null {
   try {
     const raw = window.localStorage.getItem(DISMISS_KEY);
     const n = raw ? Number(raw) : NaN;
