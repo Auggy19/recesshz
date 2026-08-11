@@ -1,0 +1,268 @@
+import { useDeviceToken } from "@/hooks/use-device-token";
+import { api } from "@/convex/_generated/api";
+import { useMutation } from "convex/react";
+import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  Gamepad2,
+  Link2,
+  Loader2,
+  MessageCircle,
+  Sparkles,
+} from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { Wordmark } from "@/components/Wordmark";
+import { Button } from "@/components/ui/button";
+
+const fadeUp = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+};
+
+interface GameCard {
+  name: string;
+  blurb: string;
+  available: boolean;
+}
+
+const upcomingGames: GameCard[] = [
+  { name: "Rock Paper Scissors", blurb: "Scissors beats paper. Fight me.", available: false },
+  { name: "Red or Black", blurb: "Pick a color. No — the other one.", available: false },
+  { name: "Twenty Questions", blurb: "Yes. No. Yes again. Got it!", available: false },
+  { name: "Truth or Dare", blurb: "Choose carefully.", available: false },
+];
+
+function MiniBoard() {
+  const cells = ["X", "", "O", "", "X", "O", "", "", "X"];
+  return (
+    <div className="grid w-24 grid-cols-3 gap-1" aria-hidden>
+      {cells.map((cell, i) => (
+        <div
+          key={i}
+          className="flex aspect-square items-center justify-center rounded-md bg-muted text-sm font-black text-foreground"
+        >
+          {cell}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function Landing() {
+  const navigate = useNavigate();
+  const deviceToken = useDeviceToken();
+  const createGame = useMutation(api.games.createGame);
+  const [creating, setCreating] = useState(false);
+
+  const handleCreateGame = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const { slug } = await createGame({
+        gameType: "tic_tac_toe",
+        deviceToken,
+      });
+      navigate(`/play/${slug}`);
+    } catch (err) {
+      console.error("Failed to create game:", err);
+      toast.error("Couldn't start a game right now. Please try again.");
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Top bar */}
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
+        <Wordmark size="md" />
+        <a
+          href="#how-it-works"
+          className="hidden text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground sm:block"
+        >
+          How it works
+        </a>
+      </header>
+
+      {/* Hero */}
+      <section className="mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mx-auto inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-semibold text-muted-foreground"
+        >
+          <Sparkles className="size-3.5 text-primary" />
+          Link-based &middot; No login &middot; Take your turn whenever
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.05 }}
+          className="mx-auto mt-6 max-w-2xl text-5xl font-black tracking-tight sm:text-6xl"
+        >
+          <Wordmark size="xl" className="justify-center" />
+          <span className="mt-3 block text-foreground">Silence is safe here.</span>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.12 }}
+          className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+        >
+          Start a game, drop the link in any chat, and your friend plays when
+          they&apos;re ready. No accounts. No downloads. No pressure.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.2 }}
+          className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
+        >
+          <Button
+            size="lg"
+            className="h-12 rounded-full px-7 text-base font-bold shadow-lg shadow-primary/25"
+            onClick={handleCreateGame}
+            disabled={creating}
+          >
+            {creating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Setting up…
+              </>
+            ) : (
+              <>
+                <Gamepad2 className="size-5" />
+                Start a game
+              </>
+            )}
+          </Button>
+          <a
+            href="#games"
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-6 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+          >
+            See the games
+            <ArrowRight className="size-4" />
+          </a>
+        </motion.div>
+      </section>
+
+      {/* Games */}
+      <section id="games" className="mx-auto w-full max-w-5xl px-5 pb-16">
+        <motion.div
+          {...fadeUp}
+          transition={{ duration: 0.4 }}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {/* Tic Tac Toe — the live card */}
+          <button
+            type="button"
+            onClick={handleCreateGame}
+            disabled={creating}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Ready to play
+            </div>
+            <MiniBoard />
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Tic Tac Toe</h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Three in a row. Pass the link, make a move, and come back when
+                it&apos;s your turn — your board waits for you.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+              {creating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
+          {/* Coming soon */}
+          {upcomingGames.map((game) => (
+            <div
+              key={game.name}
+              className="flex flex-col gap-3 rounded-3xl border border-border bg-card/60 p-6 opacity-70"
+            >
+              <span className="inline-flex w-fit rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
+                Coming soon
+              </span>
+              <h3 className="text-lg font-black tracking-tight">{game.name}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {game.blurb}
+              </p>
+            </div>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* How it works */}
+      <section id="how-it-works" className="border-y border-border bg-card/50">
+        <div className="mx-auto w-full max-w-5xl px-5 py-16">
+          <motion.div {...fadeUp} transition={{ duration: 0.4 }}>
+            <h2 className="text-center text-3xl font-black tracking-tight">
+              How Recess works
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-center text-sm text-muted-foreground">
+              No sign-ups, no friend lists — just a link and a little patience.
+            </p>
+          </motion.div>
+          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                step: "1",
+                title: "Create a game",
+                body: "Tap a game, and Recess makes you a private link in one step.",
+              },
+              {
+                step: "2",
+                title: "Share it anywhere",
+                body: "Paste the link in WhatsApp, Telegram, or any chat. It even previews nicely.",
+              },
+              {
+                step: "3",
+                title: "Play at your own pace",
+                body: "Your friend taps, joins, and you trade turns whenever you're both free.",
+              },
+            ].map((s, i) => (
+              <motion.div
+                key={s.step}
+                {...fadeUp}
+                transition={{ duration: 0.4, delay: 0.08 * i }}
+                className="rounded-3xl bg-card p-6 shadow-sm"
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-black text-white">
+                  {s.step}
+                </div>
+                <h3 className="mt-4 text-lg font-black tracking-tight">{s.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {s.body}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 px-5 py-10 text-center">
+        <Wordmark size="sm" />
+        <p className="text-sm text-muted-foreground">
+          Silence is safe here.
+        </p>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground/70">
+          <MessageCircle className="size-3.5" />
+          Built for the slow, quiet, human pace of chat.
+        </p>
+      </footer>
+    </div>
+  );
+}
