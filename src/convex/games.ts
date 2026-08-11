@@ -19,7 +19,13 @@
 // ---------------------------------------------------------------------------
 
 import { ConvexError, v } from "convex/values";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type {
   GameStatus,
   PlayerRole,
@@ -498,6 +504,26 @@ export const submitFeedback = mutation({
     });
 
     return { ok: true };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Public game metadata for social link previews (used by the /og/:slug HTTP
+// route in http.ts). Read-only and intentionally tiny: slug + game type +
+// status, enough for a crawler to build og:title / og:description. Knowing
+// the slug already means you were invited, so nothing sensitive is exposed.
+// ---------------------------------------------------------------------------
+
+export const getOgMetadata = internalQuery({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const game = await getGameBySlug(ctx, slug);
+    if (!game) return null;
+    return {
+      gameType: game.gameType,
+      status: game.status,
+      updatedAt: game.updatedAt,
+    };
   },
 });
 

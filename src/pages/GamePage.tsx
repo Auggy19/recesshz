@@ -60,16 +60,52 @@ function getApiError(err: unknown): ApiError {
   return { message: "Something went wrong. Please try again." };
 }
 
-function setMetaTag(property: string, content: string) {
-  let tag = document.querySelector<HTMLMetaElement>(
-    `meta[property="${property}"]`,
-  );
+function setMetaTag(attr: "property" | "name", key: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
   if (!tag) {
     tag = document.createElement("meta");
-    tag.setAttribute("property", property);
+    tag.setAttribute(attr, key);
     document.head.appendChild(tag);
   }
   tag.setAttribute("content", content);
+}
+
+/**
+ * Status-aware share title: "Recess — Your Turn" whenever the link is an
+ * invite or it's genuinely your move; win/loss/draw titles once it's over.
+ */
+function gameOgTitle(
+  status: GameStatus | null,
+  isRps: boolean,
+  state: TicTacToeState | null,
+  rpsState: RpsState | null,
+  myMarker: Marker | null,
+): string {
+  if (status === "waiting") return "Recess — Your Turn";
+  if (status === "abandoned") return "Recess — This game went quiet";
+  if (status === "completed") {
+    const winner = isRps
+      ? (rpsState?.matchWinner ?? null)
+      : (state?.winner ?? null);
+    if (winner === myMarker) return "Recess — You Win!";
+    if (winner === null) return "Recess — It's a Draw";
+    return "Recess — Your Friend Wins";
+  }
+  // in_progress
+  if (isRps) return "Recess — Your Turn";
+  return state?.turn === myMarker
+    ? "Recess — Your Turn"
+    : "Recess — Waiting on Your Friend";
+}
+
+function gameOgDescription(status: GameStatus | null, gameLabel: string): string {
+  if (status === "waiting") {
+    return `You've been challenged to a game of Recess (${gameLabel}). Tap to play — silence is safe here.`;
+  }
+  if (status === "abandoned") {
+    return `A game of Recess (${gameLabel}) went quiet after 48 hours. Start a fresh one — silence is safe here.`;
+  }
+  return `A game of Recess (${gameLabel}) is waiting for you. Tap to play — silence is safe here.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,21 +216,24 @@ export default function GamePage() {
 
   const gameLabel = isRps ? "Rock Paper Scissors" : "Tic Tac Toe";
 
-  // Keep the tab title + OG tags fresh for link previews.
+  // Keep the tab title + OG tags fresh for link previews (WhatsApp, Instagram,
+  // browsers re-sharing the link, etc.). Crawlers that don't run JS get their
+  // tags from the index.html defaults or the production server instead.
   useEffect(() => {
-    const invited = status === "waiting";
-    document.title = invited
-      ? "Recess — you're invited to a game!"
-      : `Recess — ${gameLabel}`;
-    setMetaTag("og:title", `Recess — ${gameLabel}`);
-    setMetaTag(
-      "og:description",
-      `You've been challenged to a game of Recess (${gameLabel}). Tap to play — silence is safe here.`,
-    );
+    const title = gameOgTitle(status, isRps, state, rpsState, myMarker);
+    const description = gameOgDescription(status, gameLabel);
+    document.title = title;
+    setMetaTag("property", "og:title", title);
+    setMetaTag("name", "twitter:title", title);
+    setMetaTag("property", "og:description", description);
+    setMetaTag("name", "twitter:description", description);
     if (typeof window !== "undefined") {
-      setMetaTag("og:image", `${window.location.origin}/og-image.png`);
+      const origin = window.location.origin;
+      setMetaTag("property", "og:image", `${origin}/og-image.png`);
+      setMetaTag("name", "twitter:image", `${origin}/og-image.png`);
+      setMetaTag("property", "og:url", shareUrl);
     }
-  }, [status, gameLabel]);
+  }, [status, isRps, state, rpsState, myMarker, gameLabel, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
