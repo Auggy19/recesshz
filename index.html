@@ -7,6 +7,21 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#F5A623" />
+  <script>
+    // Apply the saved (or system) theme before first paint to avoid a flash.
+    (function () {
+      try {
+        var stored = localStorage.getItem("recess-theme");
+        var dark =
+          stored === "dark" ||
+          (stored !== "light" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.classList.toggle("dark", dark);
+        root.style.colorScheme = dark ? "dark" : "light";
+      } catch (e) {}
+    })();
+  </script>
   <meta name="description" content="Recess — link-based async games. Create a game, drop the link in any chat, and play when it's your turn. No login. Silence is safe here." />
 
   <!-- Open Graph — renders as a rich preview when the game link is pasted

@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Wordmark } from "@/components/Wordmark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
   HeroArt,
@@ -86,12 +87,15 @@ export default function Landing() {
       {/* Top bar */}
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
         <Wordmark size="md" />
-        <a
-          href="#how-it-works"
-          className="hidden text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground sm:block"
-        >
-          How it works
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href="#how-it-works"
+            className="hidden text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground sm:block"
+          >
+            How it works
+          </a>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Hero */}

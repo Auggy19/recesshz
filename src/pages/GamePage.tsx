@@ -1,4 +1,5 @@
 import { Wordmark } from "@/components/Wordmark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { TicTacToeArt } from "@/components/GameArt";
 import { api } from "@/convex/_generated/api";
@@ -334,7 +335,7 @@ export default function GamePage() {
           <ArrowLeft className="size-4" />
         </button>
         <Wordmark size="sm" />
-        <span className="w-9" aria-hidden />
+        <ThemeToggle />
       </header>
 
       <main className="mx-auto w-full max-w-md px-5 pb-16">
