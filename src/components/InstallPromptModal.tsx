@@ -1,0 +1,182 @@
+import type { ReactNode } from "react";
+import { SquarePlus, Smartphone } from "lucide-react";
+import { toast } from "sonner";
+
+import { useA2HS } from "@/hooks/use-a2hs";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
+// ---------------------------------------------------------------------------
+// InstallPromptModal — "Add Recess to Home Screen".
+//
+// Renders a subtle trigger button plus a bottom-sheet modal with the right
+// instructions per platform:
+//   - Android / Chrome: a native "Install App" button (deferred prompt).
+//   - iOS / Safari: a 2-step visual guide (Share → Add to Home Screen).
+//
+// Nothing renders at all when the app is already installed, the browser can't
+// install, or the user said "Not now" (hidden for 7 days).
+// ---------------------------------------------------------------------------
+
+/** Safari's Share glyph — a square with an up arrow. */
+function IosShareGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="5" y="11" width="14" height="9" rx="2.5" />
+      <path d="M12 11V3" />
+      <path d="m7 7 5-5 5 5" />
+    </svg>
+  );
+}
+
+function Step({
+  number,
+  icon,
+  title,
+  children,
+}: {
+  number: number;
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-black text-primary">
+        {number}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2 text-sm font-bold">
+          <span className="text-primary">{icon}</span>
+          {title}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {children}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+interface InstallPromptModalProps {
+  /** Custom trigger button. Receives a callback that opens the sheet. */
+  renderTrigger?: (open: () => void) => ReactNode;
+}
+
+export default function InstallPromptModal({
+  renderTrigger,
+}: InstallPromptModalProps) {
+  const { canShow, status, open, setOpen, install, dismiss } = useA2HS();
+
+  // Nothing to offer: already installed, unsupported browser, or dismissed.
+  if (!canShow) return null;
+
+  const openSheet = () => setOpen(true);
+
+  // "Not now" — remember the choice for 7 days and hide the trigger.
+  const handleClose = () => dismiss();
+
+  const handleInstall = async () => {
+    const installed = await install();
+    if (installed) {
+      toast.success("Recess is on your home screen 🎉");
+    } else {
+      toast("No worries — try again anytime from the same button.");
+    }
+  };
+
+  return (
+    <>
+      {renderTrigger ? (
+        renderTrigger(openSheet)
+      ) : (
+        <button
+          type="button"
+          onClick={openSheet}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          📲 Add Recess to Home Screen
+        </button>
+      )}
+
+      <Sheet open={open} onOpenChange={(next) => (next ? setOpen(true) : handleClose())}>
+        <SheetContent
+          side="bottom"
+          className="mx-auto w-full max-w-md rounded-t-3xl border-x border-t pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        >
+          <SheetHeader className="items-center pb-2 text-center">
+            <div className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-primary text-xl font-black text-white">
+              R
+            </div>
+            <SheetTitle className="text-lg font-black tracking-tight">
+              Add Recess to your home screen
+            </SheetTitle>
+            <SheetDescription className="mx-auto max-w-xs leading-relaxed">
+              Play faster next time! Add Recess to your home screen for quick
+              access to your games and streaks.
+            </SheetDescription>
+          </SheetHeader>
+
+          {status === "installable" ? (
+            <div className="px-4">
+              <Button
+                type="button"
+                onClick={handleInstall}
+                className="h-12 w-full rounded-full text-base font-bold"
+              >
+                <Smartphone className="size-4" />
+                Install App
+              </Button>
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                One tap — Recess lives on your phone like any other app. No
+                account needed.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 px-4">
+              <Step number={1} icon={<IosShareGlyph className="size-5" />} title="Tap Share">
+                Tap the <span className="font-bold text-foreground">Share button</span> at the
+                bottom of Safari.
+              </Step>
+              <Step
+                number={2}
+                icon={<SquarePlus className="size-5" />}
+                title="Add to Home Screen"
+              >
+                Scroll down and tap{" "}
+                <span className="font-bold text-foreground">“Add to Home Screen”</span>.
+              </Step>
+            </div>
+          )}
+
+          <SheetFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClose}
+              className="w-full rounded-full text-sm font-semibold"
+            >
+              Not now
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}

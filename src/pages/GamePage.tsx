@@ -9,6 +9,7 @@ import TicTacToePlay, {
 import RpsPlay, {
   type RpsChoice,
 } from "@/components/games/RpsPlay";
+import InstallPromptModal from "@/components/InstallPromptModal";
 import { api } from "@/convex/_generated/api";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import {
@@ -556,6 +557,19 @@ export default function GamePage() {
                 </p>
               )}
             </div>
+
+            {/* Subtle A2HS prompt — only after a finished game, never on load */}
+            <InstallPromptModal
+              renderTrigger={(open) => (
+                <button
+                  type="button"
+                  onClick={open}
+                  className="mt-5 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  📲 Add Recess to Home Screen
+                </button>
+              )}
+            />
           </div>
         )}
       </main>

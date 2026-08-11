@@ -81,6 +81,18 @@ class RootErrorBoundary extends React.Component<
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
+// Register the app-shell service worker in production builds only — in dev the
+// Vite preview manages its own caching/HMR. Registration is deferred to `load`
+// and failures are swallowed (SWs are a progressive enhancement; some contexts
+// like third-party iframes disallow them).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Ignore — PWA install/offline is best-effort.
+    });
+  });
+}
+
 
 
 function RouteSyncer() {

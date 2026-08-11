@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppIcon } from "@/components/AppIcon";
+import InstallPromptModal from "@/components/InstallPromptModal";
 import { Button } from "@/components/ui/button";
 import {
   HeroArt,
@@ -381,6 +382,17 @@ export default function Landing() {
         <p className="text-sm text-muted-foreground">
           Silence is safe here.
         </p>
+        <InstallPromptModal
+          renderTrigger={(open) => (
+            <button
+              type="button"
+              onClick={open}
+              className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              📲 Add Recess to Home Screen
+            </button>
+          )}
+        />
         <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground/70">
           <MessageCircle className="size-3.5" />
           Built for the slow, quiet, human pace of chat.
