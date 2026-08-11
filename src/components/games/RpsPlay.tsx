@@ -57,8 +57,11 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
   const myPick = state.picks[myMarker] ?? localPick;
   const hasPicked = myPick !== null || picked === true;
   const opponentMarker: Marker = myMarker === "X" ? "O" : "X";
+  // The server masks picks while a round is open, so `state.picks[myMarker]`
+  // is always null client-side during "picking" — trust the server's `picked`
+  // flag instead. A resolved round still lets both players pick again.
   const alreadyPickedThisRound =
-    state.phase === "picking" && state.picks[myMarker] !== null;
+    state.phase === "picking" && picked === true;
   const canPick =
     status === "in_progress" && !isMatchOver && !alreadyPickedThisRound;
 
