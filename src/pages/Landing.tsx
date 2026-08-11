@@ -15,6 +15,15 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Wordmark } from "@/components/Wordmark";
 import { Button } from "@/components/ui/button";
+import {
+  HeroArt,
+  RedOrBlackArt,
+  RockPaperScissorsArt,
+  SwingSetArt,
+  TicTacToeArt,
+  TruthOrDareArt,
+  TwentyQuestionsArt,
+} from "@/components/GameArt";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -24,31 +33,31 @@ const fadeUp = {
 interface GameCard {
   name: string;
   blurb: string;
-  available: boolean;
+  art: React.ReactNode;
 }
 
 const upcomingGames: GameCard[] = [
-  { name: "Rock Paper Scissors", blurb: "Scissors beats paper. Fight me.", available: false },
-  { name: "Red or Black", blurb: "Pick a color. No — the other one.", available: false },
-  { name: "Twenty Questions", blurb: "Yes. No. Yes again. Got it!", available: false },
-  { name: "Truth or Dare", blurb: "Choose carefully.", available: false },
+  {
+    name: "Rock Paper Scissors",
+    blurb: "Scissors beats paper. Fight me.",
+    art: <RockPaperScissorsArt className="w-full max-w-[92px]" />,
+  },
+  {
+    name: "Red or Black",
+    blurb: "Pick a color. No — the other one.",
+    art: <RedOrBlackArt className="w-full max-w-[92px]" />,
+  },
+  {
+    name: "Twenty Questions",
+    blurb: "Yes. No. Yes again. Got it!",
+    art: <TwentyQuestionsArt className="w-full max-w-[92px]" />,
+  },
+  {
+    name: "Truth or Dare",
+    blurb: "Choose carefully.",
+    art: <TruthOrDareArt className="w-full max-w-[92px]" />,
+  },
 ];
-
-function MiniBoard() {
-  const cells = ["X", "", "O", "", "X", "O", "", "", "X"];
-  return (
-    <div className="grid w-24 grid-cols-3 gap-1" aria-hidden>
-      {cells.map((cell, i) => (
-        <div
-          key={i}
-          className="flex aspect-square items-center justify-center rounded-md bg-muted text-sm font-black text-foreground"
-        >
-          {cell}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -149,6 +158,24 @@ export default function Landing() {
             <ArrowRight className="size-4" />
           </a>
         </motion.div>
+
+        {/* Hero image — two phones, one link, a floating controller */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.28 }}
+          className="mx-auto mt-12 max-w-md"
+        >
+          <div className="relative">
+            <div
+              aria-hidden
+              className="absolute inset-4 rounded-[2.5rem] bg-primary/20 blur-2xl"
+            />
+            <div className="relative rounded-[2.5rem] border border-border bg-card p-6 shadow-xl shadow-primary/10">
+              <HeroArt className="w-full" />
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       {/* Games */}
@@ -168,7 +195,9 @@ export default function Landing() {
             <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
               Ready to play
             </div>
-            <MiniBoard />
+            <div className="rounded-2xl border border-border bg-white p-3">
+              <TicTacToeArt className="w-28 sm:w-36" />
+            </div>
             <div>
               <h3 className="text-2xl font-black tracking-tight">Tic Tac Toe</h3>
               <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
@@ -186,21 +215,69 @@ export default function Landing() {
             </span>
           </button>
 
-          {/* Coming soon */}
+          {/* Coming soon — each game gets its illustration */}
           {upcomingGames.map((game) => (
             <div
               key={game.name}
-              className="flex flex-col gap-3 rounded-3xl border border-border bg-card/60 p-6 opacity-70"
+              className="flex flex-col gap-4 rounded-3xl border border-border bg-card/60 p-6 opacity-80 transition-opacity hover:opacity-100"
             >
-              <span className="inline-flex w-fit rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
-                Coming soon
-              </span>
-              <h3 className="text-lg font-black tracking-tight">{game.name}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {game.blurb}
-              </p>
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-white p-3">
+                {game.art}
+              </div>
+              <div>
+                <span className="inline-flex w-fit rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
+                  Coming soon
+                </span>
+                <h3 className="mt-2.5 text-lg font-black tracking-tight">
+                  {game.name}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {game.blurb}
+                </p>
+              </div>
             </div>
           ))}
+        </motion.div>
+      </section>
+
+      {/* Brand mood — the swing set */}
+      <section className="mx-auto w-full max-w-5xl px-5 pb-16">
+        <motion.div
+          {...fadeUp}
+          transition={{ duration: 0.4 }}
+          className="grid items-center gap-8 overflow-hidden rounded-[2.5rem] border border-border bg-card p-8 sm:p-10 lg:grid-cols-[1.1fr_1fr]"
+        >
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              <Sparkles className="size-3.5" />
+              The Recess mood
+            </span>
+            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+              Play at the pace of a playground.
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
+              Recess is built for the slow, quiet, human pace of chat. No
+              timers, no streaks, no pressure — just a link between two people
+              who have other things going on.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="size-2 rounded-full bg-primary" />
+                No timers
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="size-2 rounded-full bg-primary" />
+                No streaks
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="size-2 rounded-full bg-primary" />
+                No pressure
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-center rounded-3xl bg-background p-6">
+            <SwingSetArt className="w-full max-w-sm" />
+          </div>
         </motion.div>
       </section>
 

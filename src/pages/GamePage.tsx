@@ -1,5 +1,6 @@
 import { Wordmark } from "@/components/Wordmark";
 import { Button } from "@/components/ui/button";
+import { TicTacToeArt } from "@/components/GameArt";
 import { api } from "@/convex/_generated/api";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { cn } from "@/lib/utils";
@@ -361,9 +362,19 @@ export default function GamePage() {
         {/* Share card */}
         {isWaiting && (
           <div className="mt-6 rounded-3xl border-2 border-dashed border-primary/50 bg-card p-5">
-            <h2 className="text-base font-black tracking-tight">
-              Send this link to your friend
-            </h2>
+            <div className="flex items-center gap-3">
+              <div className="hidden shrink-0 rounded-xl border border-border bg-white p-2 sm:block">
+                <TicTacToeArt className="w-16" />
+              </div>
+              <div>
+                <h2 className="text-base font-black tracking-tight">
+                  Send this link to your friend
+                </h2>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  You&apos;re X and play first. Your board waits.
+                </p>
+              </div>
+            </div>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               Paste it in WhatsApp or any chat. It opens straight into the game.
             </p>
