@@ -15,6 +15,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppIcon } from "@/components/AppIcon";
 import { Button } from "@/components/ui/button";
 import {
   HeroArt,
@@ -100,6 +101,23 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
+        {/* The app icon — front and center, like a launcher tile */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.21, 1.02, 0.73, 1] }}
+          className="relative mx-auto mb-8 w-fit"
+        >
+          <div
+            aria-hidden
+            className="absolute -inset-5 rounded-[3rem] bg-primary/25 blur-2xl"
+          />
+          <AppIcon
+            size="xl"
+            className="relative shadow-xl shadow-primary/30 ring-1 ring-foreground/5"
+          />
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
