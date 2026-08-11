@@ -8,7 +8,6 @@ import { useId } from "react";
 const INK = "#1A1A1A";
 const AMBER = "#F5A623";
 const AMBER_SOFT = "#F9C877";
-const AMBER_DEEP = "#E8900C";
 const WOOD = "#C98A1E";
 const CREAM = "#FFF9E5";
 const GOLD = "#E5A222";

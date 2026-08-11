@@ -50,6 +50,9 @@ const cellValidator = v.union(v.literal(""), v.literal("X"), v.literal("O"));
 // Tic Tac Toe state — a 3x3 board stored as a 9-element array in state JSON.
 // The state shape lives in `games.state` so future game types can bring their
 // own state shape alongside (see `gameType`).
+// The validator's only runtime role is to derive the type below; game state
+// itself is stored as v.any() so future game types bring their own shapes.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ticTacToeState = v.object({
   board: v.array(cellValidator),
   turn: markerValidator,

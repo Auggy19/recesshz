@@ -86,11 +86,19 @@ function Carousel({
     [scrollPrev, scrollNext]
   )
 
+  // Notify the parent's `setApi` prop once the embla instance exists — this
+  // is an external-instance handoff that must happen after mount (the api is
+  // undefined on first render), so it can't run during render.
   React.useEffect(() => {
     if (!api || !setApi) return
     setApi(api)
   }, [api, setApi])
 
+  // Subscribe to the embla instance once it exists. The initial `onSelect`
+  // seeds canScrollPrev/canScrollNext — it must run after mount (the api is
+  // undefined on first render), so it can't happen during render. This is the
+  // canonical shadcn pattern for syncing with an external carousel instance.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => {
     if (!api) return
     onSelect(api)
