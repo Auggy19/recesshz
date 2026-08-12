@@ -33,18 +33,27 @@ import type {
 } from "./schema";
 import {
   GAME_TYPE,
+  PONG_GAME_TYPE,
+  PONG_POWERS,
+  PONG_RETURN_ANGLE,
+  PONG_SERVE_ANGLE,
   RPS_GAME_TYPE,
   RED_BLACK_GAME_TYPE,
   RPS_CHOICES,
   RED_BLACK_CHOICES,
+  applyPongReturn,
+  applyPongServe,
   applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
   coinFlip,
+  freshPongState,
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   type Marker,
+  type PongPower,
+  type PongState,
   type RedBlackChoice,
   type RedBlackState,
   type RpsChoice,
@@ -77,6 +86,7 @@ const SUPPORTED_GAME_TYPES = new Set<string>([
   GAME_TYPE,
   RPS_GAME_TYPE,
   RED_BLACK_GAME_TYPE,
+  PONG_GAME_TYPE,
 ]);
 
 function freshStateFor(gameType: string): unknown {
@@ -87,6 +97,8 @@ function freshStateFor(gameType: string): unknown {
       return freshRpsState();
     case RED_BLACK_GAME_TYPE:
       return freshRedBlackState();
+    case PONG_GAME_TYPE:
+      return freshPongState();
     default:
       return fail(
         "unsupported_game",
@@ -167,7 +179,7 @@ export const createGame = mutation({
     if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
-        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, and Red or Black are supported in this build.`,
+        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, Red or Black, and Pong are supported in this build.`,
       );
     }
     if (!deviceToken || deviceToken.length < 8) {
@@ -340,8 +352,12 @@ export const submitMove = mutation({
         v.literal("black"),
       ),
     ),
+    // Pong shots: angle in degrees, power 1-3. Which field set is legal
+    // depends on the game type (validated in the per-game handlers).
+    angle: v.optional(v.number()),
+    power: v.optional(v.number()),
   },
-  handler: async (ctx, { slug, deviceToken, cell, pick }) => {
+  handler: async (ctx, { slug, deviceToken, cell, pick, angle, power }) => {
     const game = await getGameBySlug(ctx, slug);
     if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
 
@@ -376,6 +392,9 @@ export const submitMove = mutation({
         player,
         pick as RedBlackChoice | undefined,
       );
+    }
+    if (game.gameType === PONG_GAME_TYPE) {
+      return await submitPongShot(ctx, game, player, angle, power);
     }
 
     // Tic Tac Toe — cell-based move.
@@ -502,6 +521,79 @@ async function submitRedBlackGuess(
     gameId: game._id,
     playerId: player._id,
     payload: { guess, marker: player.marker, round: state.round },
+    createdAt: now,
+  });
+  await ctx.db.patch(game._id, {
+    state: outcome.state,
+    status: outcome.over
+      ? ("completed" as GameStatus)
+      : ("in_progress" as GameStatus),
+    updatedAt: now,
+  });
+
+  return { ok: true, state: outcome.state };
+}
+
+/**
+ * Pong move: one shot per turn. The phase decides the shot type — on
+ * "serve"/"point_over" the turn player serves (angle ±60°); on "return" they
+ * return (angle ±45°). The server resolves the player from the device token,
+ * validates the turn and ranges, and never lets a shot through that wasn't
+ * this player's to take.
+ */
+async function submitPongShot(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  angle: number | undefined,
+  power: number | undefined,
+) {
+  const state = game.state as PongState;
+  if (state.matchWinner) {
+    fail("invalid_move", "This match is already over.");
+  }
+
+  const isServe =
+    state.phase === "serve" || state.phase === "point_over";
+  if (!isServe && state.phase !== "return") {
+    fail("invalid_move", "This match isn't mid-point right now.");
+  }
+  if (state.turn !== player.marker) {
+    fail(
+      "invalid_move",
+      "It's not your turn yet — silence is safe here.",
+    );
+  }
+  if (typeof power !== "number" || !PONG_POWERS.includes(power as PongPower)) {
+    fail("invalid_move", "Pick a power: lob, drive, or smash.");
+  }
+  if (typeof angle !== "number" || !Number.isInteger(angle)) {
+    fail("invalid_move", "That angle isn't valid.");
+  }
+  const maxAngle = isServe ? PONG_SERVE_ANGLE : PONG_RETURN_ANGLE;
+  if (angle < -maxAngle || angle > maxAngle) {
+    fail(
+      "invalid_move",
+      isServe
+        ? "Serve angles run from -60° to +60°."
+        : "Return angles run from -45° to +45°.",
+    );
+  }
+
+  const outcome = isServe
+    ? applyPongServe(state, player.marker, angle, power as PongPower)
+    : applyPongReturn(state, player.marker, angle, power as PongPower);
+  const now = Date.now();
+
+  await ctx.db.insert("moves", {
+    gameId: game._id,
+    playerId: player._id,
+    payload: {
+      type: isServe ? "serve" : "return",
+      angle,
+      power,
+      marker: player.marker,
+    },
     createdAt: now,
   });
   await ctx.db.patch(game._id, {

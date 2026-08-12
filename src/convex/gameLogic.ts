@@ -302,3 +302,147 @@ export function applyRedBlackGuess(
     over: matchWinner !== null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Pong rules — correspondence paddle tennis, first to 7.
+//
+// Pong is real-time by nature, so Recess plays it by message: each point is
+// two moves. The server picks a shot (angle + power); the returner — who
+// sees the incoming shot, never hidden — picks a return. The ball is always
+// in play, so the point goes to the returner if their return mirrors the
+// incoming angle closely enough, otherwise to the server. The point winner
+// serves the next point; first to seven points takes the match.
+// ---------------------------------------------------------------------------
+
+export const PONG_GAME_TYPE = "pong" as const;
+
+export type PongPower = 1 | 2 | 3;
+export const PONG_POWERS: PongPower[] = [1, 2, 3];
+
+export interface PongShot {
+  angle: number;
+  power: PongPower;
+}
+
+export interface PongState {
+  /** serve = waiting for the server's shot; return = shot in flight, waiting
+   *  for the return; point_over = point resolved, winner serves next;
+   *  match_over = someone hit seven. */
+  phase: "serve" | "return" | "point_over" | "match_over";
+  /** Who must act next — the server on serve/point_over, the returner on
+   *  return. After a match ends this is the match winner. */
+  turn: Marker;
+  /** The in-flight shot, visible to the returner (that's the whole game). */
+  serve: PongShot | null;
+  scores: { X: number; O: number };
+  /** How the last point resolved — shown on both screens. */
+  lastPoint: {
+    winner: Marker;
+    serve: PongShot;
+    ret: PongShot;
+    /** True when the returner's shot mirrored the incoming angle. */
+    good: boolean;
+  } | null;
+  /** First to seven points takes the match. */
+  matchWinner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+/** Points needed to win a Pong match. */
+export const PONG_TARGET = 7;
+/** Serves run ±60°; returns ±45° (a wild return sails out of bounds). */
+export const PONG_SERVE_ANGLE = 60;
+export const PONG_RETURN_ANGLE = 45;
+
+export function freshPongState(): PongState {
+  return {
+    phase: "serve",
+    turn: "X", // the initiator serves first
+    serve: null,
+    scores: { X: 0, O: 0 },
+    lastPoint: null,
+    matchWinner: null,
+  };
+}
+
+/**
+ * How close (in degrees) the return must come to the serve's mirror for the
+ * return to count. Faster serves and harder returns both shrink the window —
+ * a smash is risky, a lob is easy to read.
+ */
+export function pongReturnWindow(
+  servePower: PongPower,
+  returnPower: PongPower,
+): number {
+  return Math.max(4, 24 - (servePower - 1) * 6 - (returnPower - 1) * 2);
+}
+
+/** A return is good when it mirrors the incoming angle within the window. */
+export function isGoodPongReturn(serve: PongShot, ret: PongShot): boolean {
+  return (
+    Math.abs(serve.angle + ret.angle) <= pongReturnWindow(serve.power, ret.power)
+  );
+}
+
+/**
+ * Record the server's shot. Callers validate phase (serve/point_over), turn,
+ * and the angle/power ranges first. The shot is immediately visible to the
+ * returner — never masked, unlike RPS picks.
+ */
+export function applyPongServe(
+  current: PongState,
+  marker: Marker,
+  angle: number,
+  power: PongPower,
+): PongOutcome {
+  return {
+    state: {
+      ...current,
+      phase: "return",
+      turn: otherMarker(marker),
+      serve: { angle, power },
+    },
+    over: false,
+  };
+}
+
+export interface PongOutcome {
+  state: PongState;
+  over: boolean;
+}
+
+/**
+ * Resolve the returner's shot against the in-flight serve. Callers validate
+ * phase ("return"), turn, and ranges first. A good return scores the
+ * returner; a miss scores the server. The point winner serves next.
+ */
+export function applyPongReturn(
+  current: PongState,
+  marker: Marker,
+  angle: number,
+  power: PongPower,
+): PongOutcome {
+  const serve = current.serve!;
+  const ret: PongShot = { angle, power };
+  const good = isGoodPongReturn(serve, ret);
+  const winner: Marker = good ? marker : otherMarker(marker);
+  const scores = {
+    ...current.scores,
+    [winner]: current.scores[winner] + 1,
+  };
+  const matchWinner: Marker | null =
+    scores[winner] >= PONG_TARGET ? winner : null;
+
+  return {
+    state: {
+      ...current,
+      phase: matchWinner ? "match_over" : "point_over",
+      turn: winner, // the point winner serves next
+      serve: null,
+      scores,
+      lastPoint: { winner, serve, ret, good },
+      matchWinner,
+    },
+    over: matchWinner !== null,
+  };
+}

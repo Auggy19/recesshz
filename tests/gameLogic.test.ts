@@ -8,19 +8,24 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  applyPongReturn,
+  applyPongServe,
   applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
   beats,
   coinFlip,
   findWinningLine,
+  freshPongState,
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   isBoardFull,
+  isGoodPongReturn,
   otherMarker,
+  pongReturnWindow,
 } from "../src/convex/gameLogic";
-import type { Board } from "../src/convex/gameLogic";
+import type { Board, PongShot } from "../src/convex/gameLogic";
 
 // --- Tic Tac Toe -----------------------------------------------------------
 
@@ -298,5 +303,111 @@ describe("red or black", () => {
       const c = coinFlip();
       expect(c === "red" || c === "black").toBe(true);
     }
+  });
+});
+
+// --- Pong -------------------------------------------------------------------
+
+describe("pong", () => {
+  test("fresh state: X serves first, first to 7", () => {
+    const s = freshPongState();
+    expect(s.phase).toBe("serve");
+    expect(s.turn).toBe("X");
+    expect(s.serve).toBeNull();
+    expect(s.scores).toEqual({ X: 0, O: 0 });
+    expect(s.lastPoint).toBeNull();
+    expect(s.matchWinner).toBeNull();
+  });
+
+  test("a serve moves to the return phase and is visible to the returner", () => {
+    const { state, over } = applyPongServe(freshPongState(), "X", 30, 2);
+    expect(over).toBe(false);
+    expect(state.phase).toBe("return");
+    expect(state.turn).toBe("O");
+    expect(state.serve).toEqual({ angle: 30, power: 2 });
+    // Unlike RPS picks, the incoming shot is never hidden.
+    expect(state.serve).not.toBeNull();
+  });
+
+  test("return window: power tradeoffs", () => {
+    expect(pongReturnWindow(1, 1)).toBe(24);
+    expect(pongReturnWindow(3, 3)).toBe(8);
+    expect(pongReturnWindow(1, 3)).toBe(20); // smash cuts your own window
+    expect(pongReturnWindow(3, 1)).toBe(12); // fast serve shrinks it
+    expect(pongReturnWindow(3, 2)).toBe(10);
+  });
+
+  test("a mirrored return within the window is good", () => {
+    const serve: PongShot = { angle: 30, power: 1 };
+    expect(isGoodPongReturn(serve, { angle: -30, power: 1 })).toBe(true);
+    expect(isGoodPongReturn(serve, { angle: -20, power: 1 })).toBe(true); // |10| <= 24
+    expect(isGoodPongReturn(serve, { angle: -5, power: 1 })).toBe(false); // |25| > 24
+  });
+
+  test("a fast edge serve forces a near-perfect mirror", () => {
+    const serve: PongShot = { angle: 55, power: 3 };
+    // Power-1 return: window 12 -> |55-45|=10 fits, but only just.
+    expect(isGoodPongReturn(serve, { angle: -45, power: 1 })).toBe(true);
+    // Power-3 smash against it: window 8 -> |10| > 8, the smash is punished.
+    expect(isGoodPongReturn(serve, { angle: -45, power: 3 })).toBe(false);
+  });
+
+  test("a good return scores the returner and they serve next", () => {
+    let s = freshPongState();
+    s = applyPongServe(s, "X", 30, 1).state;
+    const { state, over } = applyPongReturn(s, "O", -30, 1);
+    expect(over).toBe(false);
+    expect(state.phase).toBe("point_over");
+    expect(state.lastPoint).toEqual({
+      winner: "O",
+      serve: { angle: 30, power: 1 },
+      ret: { angle: -30, power: 1 },
+      good: true,
+    });
+    expect(state.scores).toEqual({ X: 0, O: 1 });
+    expect(state.turn).toBe("O"); // point winner serves next
+    expect(state.serve).toBeNull();
+  });
+
+  test("a missed return scores the server", () => {
+    let s = freshPongState();
+    s = applyPongServe(s, "X", 30, 1).state;
+    const { state } = applyPongReturn(s, "O", 20, 1);
+    expect(state.lastPoint?.good).toBe(false);
+    expect(state.lastPoint?.winner).toBe("X");
+    expect(state.scores).toEqual({ X: 1, O: 0 });
+    expect(state.turn).toBe("X");
+  });
+
+  test("the point winner serves the next point", () => {
+    // X serves, O misses -> X wins the point and serves again.
+    let s = freshPongState();
+    s = applyPongServe(s, "X", 0, 1).state;
+    s = applyPongReturn(s, "O", 30, 1).state;
+    expect(s.turn).toBe("X");
+    // X's next serve puts the ball back in flight.
+    s = applyPongServe(s, "X", -15, 2).state;
+    expect(s.phase).toBe("return");
+    expect(s.turn).toBe("O");
+    expect(s.serve).toEqual({ angle: -15, power: 2 });
+  });
+
+  test("first to seven points wins the match", () => {
+    let s = freshPongState();
+    for (let i = 0; i < 6; i++) {
+      // X serves; O's return always misses -> X scores.
+      s = applyPongServe(s, "X", 0, 1).state;
+      s = applyPongReturn(s, "O", 45, 1).state;
+      expect(s.phase).toBe("point_over");
+      expect(s.matchWinner).toBeNull();
+      expect(s.scores.X).toBe(i + 1);
+    }
+    // Point 7: X reaches the target.
+    s = applyPongServe(s, "X", 0, 1).state;
+    const { state, over } = applyPongReturn(s, "O", 45, 1);
+    expect(over).toBe(true);
+    expect(state.matchWinner).toBe("X");
+    expect(state.phase).toBe("match_over");
+    expect(state.scores).toEqual({ X: 7, O: 0 });
   });
 });

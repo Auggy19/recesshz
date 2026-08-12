@@ -316,6 +316,33 @@ export function RedOrBlackArt({ className }: ArtProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Pong — two paddles, an amber ball, dashed center line (top-down court)
+// ---------------------------------------------------------------------------
+
+export function PongArt({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 240 240" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* court outline */}
+        <rect x={24} y={28} width={192} height={184} rx={34} fill="none" stroke={INK} strokeWidth={STROKE} />
+        {/* dashed center line */}
+        <path d="M 120 46 L 120 194" stroke={INK} strokeWidth={5} strokeDasharray="2 14" strokeLinecap="round" />
+        {/* left paddle */}
+        <rect x={52} y={78} width={26} height={92} rx={13} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* right paddle */}
+        <rect x={162} y={78} width={26} height={92} rx={13} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* ball */}
+        <circle cx={120} cy={124} r={19} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Twenty Questions — a chunky speech bubble with a big question mark
 // ---------------------------------------------------------------------------
 

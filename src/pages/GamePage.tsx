@@ -2,6 +2,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
+  PongArt,
   RedOrBlackArt,
   RockPaperScissorsArt,
   TicTacToeArt,
@@ -16,6 +17,9 @@ import RpsPlay, {
 import RedBlackPlay, {
   type RedBlackChoice,
 } from "@/components/games/RedBlackPlay";
+import PongPlay, {
+  type PongPower,
+} from "@/components/games/PongPlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
@@ -74,6 +78,21 @@ interface RedBlackState {
   rematch?: { slug: string; by: string };
 }
 
+interface PongState {
+  phase: "serve" | "return" | "point_over" | "match_over";
+  turn: Marker;
+  serve: { angle: number; power: PongPower } | null;
+  scores: { X: number; O: number };
+  lastPoint: {
+    winner: Marker;
+    serve: { angle: number; power: PongPower };
+    ret: { angle: number; power: PongPower };
+    good: boolean;
+  } | null;
+  matchWinner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
 interface ApiError {
   code?: string;
   message?: string;
@@ -97,9 +116,11 @@ function gameOgTitle(
   gameLabel: string,
   isRps: boolean,
   isRedBlack: boolean,
+  isPong: boolean,
   state: TicTacToeState | null,
   rpsState: RpsState | null,
   rbState: RedBlackState | null,
+  pongState: PongState | null,
   myMarker: Marker | null,
 ): string {
   if (status === "waiting") return `${gameLabel} — Your Turn`;
@@ -109,12 +130,19 @@ function gameOgTitle(
       ? (rpsState?.matchWinner ?? null)
       : isRedBlack
         ? (rbState?.matchWinner ?? null)
-        : (state?.winner ?? null);
+        : isPong
+          ? (pongState?.matchWinner ?? null)
+          : (state?.winner ?? null);
     if (winner === myMarker) return `${gameLabel} — You Win!`;
     if (winner === null) return `${gameLabel} — It's a Draw`;
     return `${gameLabel} — Your Friend Wins`;
   }
   // in_progress
+  if (isPong) {
+    return pongState?.turn === myMarker
+      ? `${gameLabel} — Your Turn`
+      : `${gameLabel} — Waiting on Your Friend`;
+  }
   if (isRps) return `${gameLabel} — Your Turn`;
   if (isRedBlack) {
     // Only the guesser (O) ever has a turn in Red or Black.
@@ -244,17 +272,21 @@ export default function GamePage() {
   const gameType = game?.gameType ?? "tic_tac_toe";
   const isRps = gameType === "rock_paper_scissors";
   const isRedBlack = gameType === "red_or_black";
-  // RPS and Red or Black share the same match shape (rounds + scores).
-  const matchGame = isRps || isRedBlack;
+  const isPong = gameType === "pong";
+  // RPS, Red or Black, and Pong share the same match shape (rounds + scores).
+  const matchGame = isRps || isRedBlack || isPong;
   const status: GameStatus | null = game?.status ?? null;
   const state = (game?.state as TicTacToeState) ?? null;
   const rpsState = (game?.state as RpsState) ?? null;
   const rbState = (game?.state as RedBlackState) ?? null;
+  const pongState = (game?.state as PongState) ?? null;
   const myMarker: Marker | null = game?.me?.marker ?? me?.marker ?? null;
   const matchWinner: Marker | null = matchGame
     ? isRps
       ? (rpsState?.matchWinner ?? null)
-      : (rbState?.matchWinner ?? null)
+      : isRedBlack
+        ? (rbState?.matchWinner ?? null)
+        : (pongState?.matchWinner ?? null)
     : null;
 
   const isOver = matchGame
@@ -265,7 +297,9 @@ export default function GamePage() {
     ? "Rock Paper Scissors"
     : isRedBlack
       ? "Red or Black"
-      : "Tic Tac Toe";
+      : isPong
+        ? "Pong"
+        : "Tic Tac Toe";
 
   // Record the streak exactly once when a game completes — the ref guards
   // against the reactive query re-delivering the same terminal state, while
@@ -291,9 +325,11 @@ export default function GamePage() {
       gameLabel,
       isRps,
       isRedBlack,
+      isPong,
       state,
       rpsState,
       rbState,
+      pongState,
       myMarker,
     );
     applyOgMeta(
@@ -305,7 +341,7 @@ export default function GamePage() {
       },
       shareUrl,
     );
-  }, [status, isRps, isRedBlack, state, rpsState, rbState, myMarker, gameLabel, gameType, shareUrl]);
+  }, [status, isRps, isRedBlack, isPong, state, rpsState, rbState, pongState, myMarker, gameLabel, gameType, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
@@ -343,6 +379,16 @@ export default function GamePage() {
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That guess didn't go through.");
+      return false;
+    }
+  };
+
+  const handleShot = async (angle: number, power: PongPower): Promise<boolean> => {
+    try {
+      await submitMove({ slug, deviceToken, angle, power });
+      return true;
+    } catch (err) {
+      setMoveError(getApiError(err).message ?? "That shot didn't go through.");
       return false;
     }
   };
@@ -460,12 +506,16 @@ export default function GamePage() {
   const myScore = matchGame
     ? isRps
       ? rpsState!.scores[myMarker!]
-      : rbState!.scores[myMarker!]
+      : isRedBlack
+        ? rbState!.scores[myMarker!]
+        : pongState!.scores[myMarker!]
     : 0;
   const oppScore = matchGame
     ? isRps
       ? rpsState!.scores[myMarker === "X" ? "O" : "X"]
-      : rbState!.scores[myMarker === "X" ? "O" : "X"]
+      : isRedBlack
+        ? rbState!.scores[myMarker === "X" ? "O" : "X"]
+        : pongState!.scores[myMarker === "X" ? "O" : "X"]
     : 0;
 
   const resultTitle = matchGame
@@ -495,7 +545,9 @@ export default function GamePage() {
   const rematch = matchGame
     ? isRps
       ? rpsState?.rematch
-      : rbState?.rematch
+      : isRedBlack
+        ? rbState?.rematch
+        : pongState?.rematch
     : (state.rematch ?? null);
 
   return (
@@ -523,6 +575,8 @@ export default function GamePage() {
                   <RockPaperScissorsArt className="w-16" />
                 ) : isRedBlack ? (
                   <RedOrBlackArt className="w-16" />
+                ) : isPong ? (
+                  <PongArt className="w-16" />
                 ) : (
                   <TicTacToeArt className="w-16" />
                 )}
@@ -536,7 +590,9 @@ export default function GamePage() {
                     ? "You're X. Best of three — make your pick when they join."
                     : isRedBlack
                       ? "You're the host. Your friend picks red or black — you watch the reveal."
-                      : "You're X and play first. Your board waits."}
+                      : isPong
+                        ? "You're X and serve first — first to 7 points wins."
+                        : "You're X and play first. Your board waits."}
                 </p>
               </div>
             </div>
@@ -593,6 +649,13 @@ export default function GamePage() {
               status={status}
               myMarker={myMarker!}
               onGuess={handleGuess}
+            />
+          ) : isPong ? (
+            <PongPlay
+              state={pongState!}
+              status={status}
+              myMarker={myMarker!}
+              onShot={handleShot}
             />
           ) : (
             <TicTacToePlay

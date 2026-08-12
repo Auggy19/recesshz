@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { applyOgMeta, resolveOgMeta } from "@/lib/og";
 import {
   HeroArt,
+  PongArt,
   RedOrBlackArt,
   RockPaperScissorsArt,
   SwingSetArt,
@@ -60,6 +61,10 @@ function urlGameToType(raw: string | null): string | null {
     case "redblack":
     case "rnb":
       return "red_or_black";
+    case "pong":
+    case "ping-pong":
+    case "ping_pong":
+      return "pong";
     default:
       return null;
   }
@@ -381,6 +386,36 @@ export default function Landing() {
             </span>
           </button>
 
+          {/* Pong — the fourth live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("pong")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Ready to play
+            </div>
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+              <PongArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Pong</h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Classic paddle tennis, by message. Serve an angle, read the
+                return, and chase the rally — first to 7 points takes it.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+              {creating === "pong" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
           {/* Coming soon — each game gets its illustration */}
           {upcomingGames.map((game) => (
             <div
@@ -440,6 +475,7 @@ export default function Landing() {
                   ["tic_tac_toe", "Tic Tac Toe"],
                   ["rock_paper_scissors", "RPS"],
                   ["red_or_black", "Red/Black"],
+                  ["pong", "Pong"],
                 ] as const
               ).map(([value, label]) => (
                 <button

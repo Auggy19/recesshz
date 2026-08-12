@@ -24,12 +24,14 @@ export const OG_GAME_NAMES: Record<string, string> = {
   tic_tac_toe: "Tic Tac Toe",
   rock_paper_scissors: "Rock Paper Scissors",
   red_or_black: "Red or Black",
+  pong: "Pong",
 };
 
 export const OG_GAME_IMAGES: Record<string, string> = {
   tic_tac_toe: "/og-tic-tac-toe.png",
   rock_paper_scissors: "/og-rock-paper-scissors.png",
   red_or_black: "/og-red-or-black.png",
+  pong: "/og-pong.png",
 };
 
 export const OG_BRAND_TITLE = "Recess — Silence is safe here.";
@@ -67,6 +69,9 @@ export function gameKeyFromParam(raw: string | null): string | null {
     case "redblack":
     case "rnb":
       return "red_or_black";
+    case "pong":
+    case "ping_pong":
+      return "pong";
     default:
       return null;
   }

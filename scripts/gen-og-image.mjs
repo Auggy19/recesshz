@@ -8,6 +8,7 @@
 //     public/og-tic-tac-toe.png
 //     public/og-rock-paper-scissors.png
 //     public/og-red-or-black.png
+//     public/og-pong.png
 //
 //   Template 2 — the bare app link. The logo mark + wordmark centered on the
 //   amber background, tagline below — no game board:
@@ -296,6 +297,23 @@ function drawRedBlack(set) {
   pip(730, 385);
 }
 
+/** The Pong court: two amber paddles with ink outlines, a dashed center
+ *  line, and an amber ball — the top-down view from the PongArt icon. */
+function drawPong(set) {
+  const paddle = (x0) => {
+    strokeRoundedRect(set, x0 - 22, 205, x0 + 22, 425, 20, 10, INK);
+    fillRoundedRect(set, x0 - 14, 215, x0 + 14, 415, 14, AMBER);
+  };
+  paddle(440);
+  paddle(760);
+  // dashed center line — short ink segments
+  for (let y = 210; y <= 425; y += 26) {
+    line(set, 600, y, 600, y + 12, 8, INK);
+  }
+  fillCircle(set, 600, 315, 34, AMBER);
+  strokeCircle(set, 600, 315, 34, 10, INK);
+}
+
 /** Renders a Template 1 game card to `outFile`. */
 function renderGameCard(board, outFile) {
   const { img, set } = newCanvas();
@@ -314,7 +332,8 @@ function renderGameCard(board, outFile) {
 
   if (board === "ttt") drawTtt(set);
   else if (board === "rps") drawRps(set);
-  else drawRedBlack(set);
+  else if (board === "redblack") drawRedBlack(set);
+  else drawPong(set);
 
   // Tagline below the card.
   const tagline = "silence is safe here.";
@@ -414,6 +433,7 @@ function writePng(outFile, img) {
 renderGameCard("ttt", "public/og-tic-tac-toe.png");
 renderGameCard("rps", "public/og-rock-paper-scissors.png");
 renderGameCard("redblack", "public/og-red-or-black.png");
+renderGameCard("pong", "public/og-pong.png");
 renderBrandCard("public/og-app.png");
 
 // Alias kept for stale references — identical composition to the TTT card.
@@ -426,6 +446,7 @@ if (process.argv.includes("--ascii")) {
     "public/og-tic-tac-toe.png",
     "public/og-rock-paper-scissors.png",
     "public/og-red-or-black.png",
+    "public/og-pong.png",
   ];
   for (const f of files) {
     const b = readFileSync(f);

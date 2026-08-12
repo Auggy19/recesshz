@@ -36,6 +36,8 @@ describe("gameKeyFromParam", () => {
     expect(gameKeyFromParam("red-or-black")).toBe("red_or_black");
     expect(gameKeyFromParam("redblack")).toBe("red_or_black");
     expect(gameKeyFromParam("rnb")).toBe("red_or_black");
+    expect(gameKeyFromParam("pong")).toBe("pong");
+    expect(gameKeyFromParam("ping-pong")).toBe("pong");
   });
 
   test("returns null for missing or unknown values", () => {
@@ -65,6 +67,8 @@ describe("template copy (spec)", () => {
     );
     expect(gameInviteMeta("red_or_black").title).toBe("Red or Black — Your Turn");
     expect(gameInviteMeta("red_or_black").image).toBe("/og-red-or-black.png");
+    expect(gameInviteMeta("pong").title).toBe("Pong — Your Turn");
+    expect(gameInviteMeta("pong").image).toBe("/og-pong.png");
   });
 
   test("game invite with an unknown game type falls back gracefully", () => {
@@ -97,6 +101,8 @@ describe("resolveOgMeta — which template for which URL", () => {
     expect(resolveOgMeta("?room=X&game=red_or_black").title).toBe(
       "Red or Black — Your Turn",
     );
+    expect(resolveOgMeta("?room=X&game=pong").title).toBe("Pong — Your Turn");
+    expect(resolveOgMeta("?room=X&game=pong").image).toBe("/og-pong.png");
   });
 
   test("bare root (no params) -> brand card", () => {
