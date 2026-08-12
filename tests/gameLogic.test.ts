@@ -25,7 +25,7 @@ import {
   otherMarker,
   pongReturnWindow,
 } from "../src/convex/gameLogic";
-import type { Board, PongShot } from "../src/convex/gameLogic";
+import type { PongShot } from "../src/convex/gameLogic";
 
 // --- Tic Tac Toe -----------------------------------------------------------
 
@@ -102,13 +102,9 @@ describe("tic tac toe", () => {
   });
 
   test("a full board with no line is a draw", () => {
-    // Classic draw board.
-    const board: Board = ["X", "O", "X", "O", "O", "X", "X", "X", "O"];
+    // Walk all 9 cells with strict alternation; the final move fills the last
+    // empty cell without creating a line.
     let s = freshTicTacToeState();
-    s = { ...s, board };
-    const { state } = applyTicTacToeMove(s, 4, "O"); // any legal-looking move
-    // Rebuild a genuine draw by walking all 9 cells with alternation:
-    let t = freshTicTacToeState();
     const moves: Array<[number, "X" | "O"]> = [
       [0, "X"],
       [1, "O"],
@@ -120,12 +116,16 @@ describe("tic tac toe", () => {
       [6, "O"],
       [8, "X"],
     ];
+    let over = false;
     for (const [cell, marker] of moves) {
-      t = applyTicTacToeMove(t, cell, marker).state;
+      const outcome = applyTicTacToeMove(s, cell, marker);
+      s = outcome.state;
+      over = outcome.over;
     }
-    expect(t.winner).toBeNull();
-    expect(t.draw).toBe(true);
-    expect(state).toBeDefined();
+    expect(over).toBe(true);
+    expect(s.winner).toBeNull();
+    expect(s.draw).toBe(true);
+    expect(s.winningLine).toBeNull();
   });
 });
 

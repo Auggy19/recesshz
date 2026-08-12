@@ -259,7 +259,12 @@ export const joinGame = mutation({
 
     const me = await getPlayer(ctx, game._id, deviceToken);
     if (me) {
-      // Already a player — idempotent re-join (safe on retries).
+      // Already a player — idempotent re-join (safe on retries). Re-opening
+      // the link is an explicit action, so it refreshes the 48-hour
+      // "untouched" clock: a player who keeps checking on the game shouldn't
+      // have it abandoned underneath them. (The reactive getGameState poll is
+      // a read and deliberately doesn't touch the clock.)
+      await ctx.db.patch(game._id, { updatedAt: Date.now() });
       return { joined: true, me: { role: me.role, marker: me.marker } };
     }
 

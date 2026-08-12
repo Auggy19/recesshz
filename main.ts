@@ -20,9 +20,31 @@ app.use("*", serveStatic({ root: "./dist" }));
 // to the static tags in index.html, which already brand the preview.
 // ---------------------------------------------------------------------------
 
+// Per-game names + card images, mirroring the client OG system in
+// src/lib/og.ts (kept in sync deliberately — this is the only path crawlers
+// see on /play/:slug, so it must render the same Template-1 card the SPA does).
+const GAME_LABELS: Record<string, string> = {
+  tic_tac_toe: "Tic Tac Toe",
+  rock_paper_scissors: "Rock Paper Scissors",
+  red_or_black: "Red or Black",
+  pong: "Pong",
+};
+const GAME_IMAGES: Record<string, string> = {
+  tic_tac_toe: "/og-tic-tac-toe.png",
+  rock_paper_scissors: "/og-rock-paper-scissors.png",
+  red_or_black: "/og-red-or-black.png",
+  pong: "/og-pong.png",
+};
+
+function labelFor(gameType: string): string {
+  return GAME_LABELS[gameType] ?? "Recess";
+}
+
 interface OgMeta {
   title: string;
   description: string;
+  image: string;
+  imageAlt: string;
 }
 
 /** Cache of the last rendered HTML per slug — crawlers re-scrape the same
@@ -51,29 +73,31 @@ function convexSiteUrl(): string | null {
   return null;
 }
 
-function titleFor(status: string): string {
+function titleFor(status: string, gameType: string): string {
+  const label = labelFor(gameType);
   switch (status) {
     case "completed":
-      return "Recess — Game Over";
+      // A crawler can't know who won (state isn't exposed publicly), so the
+      // finished-game title stays neutral but keeps the game name.
+      return `${label} — Game Over`;
     case "abandoned":
       return "Recess — This game went quiet";
     default:
       // "waiting" (a fresh invite) and "in_progress" both read as an
       // invitation to act — the primary share scenario.
-      return "Recess — Your Turn";
+      return `${label} — Your Turn`;
   }
 }
 
 function descriptionFor(status: string, gameType: string): string {
-  const label =
-    gameType === "rock_paper_scissors" ? "Rock Paper Scissors" : "Tic Tac Toe";
+  const label = labelFor(gameType);
   if (status === "waiting") {
-    return `You've been challenged to a game of Recess (${label}). Tap to play — silence is safe here.`;
+    return `You've been challenged to a game of ${label}. Tap to play — works on any chat app.`;
   }
   if (status === "abandoned") {
-    return `A game of Recess (${label}) went quiet after 48 hours. Start a fresh one — silence is safe here.`;
+    return `A game of ${label} went quiet after 48 hours. Start a fresh one — silence is safe here.`;
   }
-  return `A game of Recess (${label}) is waiting for you. Tap to play — silence is safe here.`;
+  return `A game of ${label} is waiting for you. Tap to play — works on any chat app.`;
 }
 
 async function fetchOgMeta(slug: string): Promise<OgMeta | null> {
@@ -93,9 +117,13 @@ async function fetchOgMeta(slug: string): Promise<OgMeta | null> {
     ) {
       return null;
     }
+    const gameType = data.gameType;
+    const image = GAME_IMAGES[gameType] ?? "/og-app.png";
     return {
-      title: titleFor(data.status),
-      description: descriptionFor(data.status, data.gameType),
+      title: titleFor(data.status, gameType),
+      description: descriptionFor(data.status, gameType),
+      image,
+      imageAlt: `A game of ${labelFor(gameType)} waiting for you.`,
     };
   } catch {
     return null;
@@ -115,12 +143,13 @@ function injectOgTags(html: string, meta: OgMeta, url: string): string {
   const tags: Array<[key: string, attr: "property" | "name", content: string]> = [
     ["og:title", "property", meta.title],
     ["og:description", "property", meta.description],
-    ["og:image", "property", `${origin}/og-image.png`],
+    ["og:image", "property", `${origin}${meta.image}`],
     ["og:url", "property", url],
     ["twitter:card", "name", "summary_large_image"],
     ["twitter:title", "name", meta.title],
     ["twitter:description", "name", meta.description],
-    ["twitter:image", "name", `${origin}/og-image.png`],
+    ["twitter:image", "name", `${origin}${meta.image}`],
+    ["og:image:alt", "property", meta.imageAlt],
   ];
   let out = html;
   for (const [key, attr, content] of tags) {
