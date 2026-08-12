@@ -18,6 +18,7 @@ import {
   cleanupAbandoned,
   createGame,
   getGameState,
+  getOgMetadata,
   joinGame,
   playAgain,
   submitFeedback,
@@ -149,6 +150,29 @@ describe("createGame", () => {
     })) as { slug: string };
     expect(fresh.slug).not.toBe(game.slug);
     expect(fresh.slug).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test("an alive room for a different game type gets a fresh slug, never the wrong game", async () => {
+    const db = new FakeDb();
+    await run(createGame, db, {
+      gameType: "pong",
+      deviceToken: "device-A",
+      slug: "sunny-4c",
+    });
+    // Someone opens ?room=sunny-4c&game=tic-tac-toe — the room is a live Pong
+    // game, so the invite must not silently hand them a game the preview
+    // didn't promise.
+    const res = (await run(createGame, db, {
+      gameType: "tic_tac_toe",
+      deviceToken: "device-B",
+      slug: "sunny-4c",
+    })) as { slug: string };
+    expect(res.slug).not.toBe("sunny-4c");
+    expect(res.slug).toMatch(/^[0-9a-f-]{36}$/);
+    const fresh = gameBySlug(db, res.slug);
+    expect(fresh.gameType).toBe("tic_tac_toe");
+    // The original Pong room is untouched.
+    expect(gameBySlug(db, "sunny-4c").gameType).toBe("pong");
   });
 
   test("rejects malformed room tokens", async () => {
@@ -465,6 +489,20 @@ describe("submitMove — Rock Paper Scissors", () => {
     expect(gameBySlug(db, slug).status).toBe("completed");
   });
 
+  test("the pick that starts a new round is audited against the new round", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "rock_paper_scissors");
+    // Round 1: X wins.
+    await run(submitMove, db, { slug, deviceToken: "device-A", pick: "rock" });
+    await run(submitMove, db, { slug, deviceToken: "device-B", pick: "scissors" });
+    // X opens round 2 — this move belongs to round 2, not round 1.
+    await run(submitMove, db, { slug, deviceToken: "device-A", pick: "paper" });
+    const rounds = db
+      .all("moves")
+      .map((m) => (m.payload as { round: number }).round);
+    expect(rounds).toEqual([1, 1, 2]);
+  });
+
   test("a non-player's pick is rejected", async () => {
     const db = new FakeDb();
     const { slug } = await twoPlayerGame(db, "rock_paper_scissors");
@@ -524,6 +562,18 @@ describe("submitMove — Red or Black", () => {
     }
     expect(["X", "O"]).toContain(state.matchWinner);
     expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("a guess that opens a new round is audited against the new round", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "red_or_black");
+    await run(submitMove, db, { slug, deviceToken: "device-B", pick: "red" });
+    // The next guess opens round 2 — it must be audited as round 2.
+    await run(submitMove, db, { slug, deviceToken: "device-B", pick: "red" });
+    const rounds = db
+      .all("moves")
+      .map((m) => (m.payload as { round: number }).round);
+    expect(rounds).toEqual([1, 2]);
   });
 });
 
@@ -744,5 +794,39 @@ describe("cleanupAbandoned", () => {
     const res = (await run(cleanupAbandoned, db)) as { abandoned: number };
     expect(res.abandoned).toBe(0);
     expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /og/:slug — public metadata for social link previews (server-side OG
+// baking in main.ts fetches this when a crawler hits /play/:slug)
+// ---------------------------------------------------------------------------
+
+describe("getOgMetadata", () => {
+  test("exposes only public metadata for a live game", async () => {
+    const db = new FakeDb();
+    const { slug, game } = await newGame(db);
+    const meta = (await run(getOgMetadata, db, { slug })) as {
+      gameType: string;
+      status: string;
+      updatedAt: number;
+    };
+    expect(meta.gameType).toBe("tic_tac_toe");
+    expect(meta.status).toBe("waiting");
+    expect(meta.updatedAt).toBe(game.updatedAt);
+    // No player data, no state — just enough for a crawler to build a card.
+    expect(Object.keys(meta).sort()).toEqual(["gameType", "status", "updatedAt"]);
+  });
+
+  test("returns null for an unknown slug", async () => {
+    const db = new FakeDb();
+    await expect(run(getOgMetadata, db, { slug: "nope" })).resolves.toBeNull();
+  });
+
+  test("reflects the current status", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db);
+    const meta = (await run(getOgMetadata, db, { slug })) as { status: string };
+    expect(meta.status).toBe("in_progress");
   });
 });

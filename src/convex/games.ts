@@ -199,11 +199,17 @@ export const createGame = mutation({
       }
       const existing = await getGameBySlug(ctx, requestedSlug);
       if (existing) {
-        if (existing.status === "waiting" || existing.status === "in_progress") {
-          // Room already alive — both players share this same link.
+        if (
+          (existing.status === "waiting" || existing.status === "in_progress") &&
+          existing.gameType === gameType
+        ) {
+          // Room already alive and the same game — both players share this
+          // same link.
           return { slug: existing.slug };
         }
-        // Dead room: mint a fresh slug instead of reusing it.
+        // Dead room, or an alive room for a different game: mint a fresh slug
+        // instead of reusing it — the link preview must match the game the
+        // player actually lands in, never a silent hand-off to another game.
         slug = crypto.randomUUID();
       } else {
         slug = requestedSlug;
@@ -469,7 +475,9 @@ async function submitRpsPick(
   await ctx.db.insert("moves", {
     gameId: game._id,
     playerId: player._id,
-    payload: { pick, marker: player.marker, round: state.round },
+    // Audit against the round the pick actually lands in: when a pick opens
+    // a new round, applyRpsPick has already advanced it by now.
+    payload: { pick, marker: player.marker, round: outcome.state.round },
     createdAt: now,
   });
   await ctx.db.patch(game._id, {
@@ -525,7 +533,9 @@ async function submitRedBlackGuess(
   await ctx.db.insert("moves", {
     gameId: game._id,
     playerId: player._id,
-    payload: { guess, marker: player.marker, round: state.round },
+    // Audit against the round the guess actually lands in: a guess after a
+    // resolved round advances to the next round inside applyRedBlackGuess.
+    payload: { guess, marker: player.marker, round: outcome.state.round },
     createdAt: now,
   });
   await ctx.db.patch(game._id, {
