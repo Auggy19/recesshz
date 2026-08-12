@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#F5A623" />
+
+  <!-- PWA / Add-to-Home-Screen support (iOS Safari + Android Chrome) -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Recess" />
+  <script>
+    // Apply the saved (or system) theme before first paint to avoid a flash.
+    (function () {
+      try {
+        var stored = localStorage.getItem("recess-theme");
+        var dark =
+          stored === "dark" ||
+          (stored !== "light" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.classList.toggle("dark", dark);
+        root.style.colorScheme = dark ? "dark" : "light";
+      } catch (e) {}
+    })();
+  </script>
+  <meta name="description" content="Recess — link-based async games. Create a game, drop the link in any chat, and play when it's your turn. No login. Silence is safe here." />
+
+  <!-- Open Graph — renders as a rich preview when the game link is pasted
+       into WhatsApp / Telegram / Facebook. These defaults are what a crawler
+       sees; the production server (main.ts) bakes per-game tags into the
+       /play/:slug page, and the client refreshes them in-browser too. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Recess" />
+  <meta property="og:title" content="Recess — Your Turn" />
+  <meta property="og:description" content="You've been challenged to a game of Recess. Tap to play — silence is safe here." />
+  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Recess — a link-based game waiting for you." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Recess — Your Turn" />
+  <meta name="twitter:description" content="You've been challenged to a game of Recess. Tap to play — silence is safe here." />
+  <meta name="twitter:image" content="/og-image.png" />
+
+  <title>Recess.hz</title>
+  <script type="module" crossorigin src="/assets/index-CmismDYS.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/framer-motion-D5IBGcks.js">
+  <link rel="modulepreload" crossorigin href="/assets/radix-ui-C6xrIjlF.js">
+  <link rel="modulepreload" crossorigin href="/assets/react-vendor-BaXqXJ_5.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-BfwA6ALK.css">
+</head>
+
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>
