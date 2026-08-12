@@ -31,25 +31,84 @@
   </script>
   <meta name="description" content="Recess — link-based async games. Create a game, drop the link in any chat, and play when it's your turn. No login. Silence is safe here." />
 
-  <!-- Open Graph — renders as a rich preview when the game link is pasted
-       into WhatsApp / Telegram / Facebook. These defaults are what a crawler
-       sees; the production server (main.ts) bakes per-game tags into the
-       /play/:slug page, and the client refreshes them in-browser too. -->
+  <!-- Open Graph — renders as a rich preview when a Recess link is pasted
+       into WhatsApp / Telegram / Facebook. Two templates:
+
+       Template 1 — a game invite (a room link with ?room=...&game=..., or
+       /play/:slug): "[Game] — Your Turn" with that game's thumbnail. The
+       inline script below swaps the static defaults to it before the bundle
+       loads, and GamePage keeps it status-aware on /play/:slug.
+
+       Template 2 — the bare app link: the brand card "Recess — Silence is
+       safe here." with the logo-on-amber image. This is the static default
+       below, so even a crawler that doesn't run JS sees the right card on
+       the root URL. -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Recess" />
-  <meta property="og:title" content="Recess — Your Turn" />
-  <meta property="og:description" content="You've been challenged to a game of Recess. Tap to play — silence is safe here." />
-  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:title" content="Recess — Silence is safe here." />
+  <meta property="og:description" content="Turn any chat lull into a quick game. No login, no download — just tap and play. Works on WhatsApp, iMessage, Telegram, and more." />
+  <meta property="og:image" content="/og-app.png" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Recess — a link-based game waiting for you." />
+  <meta property="og:image:alt" content="Recess — turn any chat lull into a quick game." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Recess — Your Turn" />
-  <meta name="twitter:description" content="You've been challenged to a game of Recess. Tap to play — silence is safe here." />
-  <meta name="twitter:image" content="/og-image.png" />
+  <meta name="twitter:title" content="Recess — Silence is safe here." />
+  <meta name="twitter:description" content="Turn any chat lull into a quick game. No login, no download — just tap and play. Works on WhatsApp, iMessage, Telegram, and more." />
+  <meta name="twitter:image" content="/og-app.png" />
 
-  <title>Recess.hz</title>
+  <title>Recess — Silence is safe here.</title>
+
+  <script>
+    // Game-invite template: when the root URL carries room/game params
+    // (?room=ABC123&game=tic-tac-toe), swap the static brand-card defaults
+    // for the specific game card before the bundle loads — the SPA
+    // equivalent of server-side tag selection (Freebuff serves a static
+    // build, so this runs during the initial HTML parse). Mirrors
+    // src/lib/og.ts; keep the alias set in sync.
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var g = (params.get("game") || "").toLowerCase().replace(/-/g, "_");
+        var key =
+          g === "tic_tac_toe" || g === "ttt"
+            ? "tic_tac_toe"
+            : g === "rock_paper_scissors" || g === "rps"
+              ? "rock_paper_scissors"
+              : g === "red_or_black" || g === "redblack" || g === "rnb"
+                ? "red_or_black"
+                : null;
+        if (!params.get("room") || !key) return;
+        var names = {
+          tic_tac_toe: "Tic Tac Toe",
+          rock_paper_scissors: "Rock Paper Scissors",
+          red_or_black: "Red or Black",
+        };
+        var images = {
+          tic_tac_toe: "/og-tic-tac-toe.png",
+          rock_paper_scissors: "/og-rock-paper-scissors.png",
+          red_or_black: "/og-red-or-black.png",
+        };
+        var title = names[key] + " \u2014 Your Turn";
+        var desc =
+          "You've been challenged to a game. Tap to play \u2014 works on any chat app.";
+        function set(attr, name, content) {
+          var tag = document.querySelector('meta[' + attr + '="' + name + '"]');
+          if (tag) tag.setAttribute("content", content);
+        }
+        document.title = title;
+        set("property", "og:title", title);
+        set("name", "twitter:title", title);
+        set("property", "og:description", desc);
+        set("name", "twitter:description", desc);
+        set("property", "og:image", images[key]);
+        set("name", "twitter:image", images[key]);
+        set("property", "og:image:alt", "A game of " + names[key] + " waiting for you.");
+      } catch (e) {
+        // Never block first paint over preview tags.
+      }
+    })();
+  </script>
 </head>
 
 

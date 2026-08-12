@@ -22,6 +22,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppIcon } from "@/components/AppIcon";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import { Button } from "@/components/ui/button";
+import { applyOgMeta, resolveOgMeta } from "@/lib/og";
 import {
   HeroArt,
   RedOrBlackArt,
@@ -123,6 +124,14 @@ export default function Landing() {
     if (!code) return;
     void handleCreateGame(roomGame, code);
   };
+
+  // Open Graph: the bare root link previews as the brand card; a room link
+  // (?room=...&game=...) previews as that game's invite card. The inline head
+  // script already picked one of these before the bundle loaded — this keeps
+  // them correct for SPA re-renders and browsers that re-share the page URL.
+  useEffect(() => {
+    applyOgMeta(resolveOgMeta(window.location.search));
+  }, []);
 
   // Instant room creation: opening /?room=XYZ&game=tic-tac-toe joins (or
   // creates) that room and drops the player straight into the game. Runs once

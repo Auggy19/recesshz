@@ -19,6 +19,12 @@ import RedBlackPlay, {
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
+import {
+  OG_BRAND_IMAGE,
+  OG_CHALLENGE_DESCRIPTION,
+  OG_GAME_IMAGES,
+  applyOgMeta,
+} from "@/lib/og";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
 import {
@@ -82,22 +88,13 @@ function getApiError(err: unknown): ApiError {
   return { message: "Something went wrong. Please try again." };
 }
 
-function setMetaTag(attr: "property" | "name", key: string, content: string) {
-  let tag = document.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
-  if (!tag) {
-    tag = document.createElement("meta");
-    tag.setAttribute(attr, key);
-    document.head.appendChild(tag);
-  }
-  tag.setAttribute("content", content);
-}
-
 /**
- * Status-aware share title: "Recess — Your Turn" whenever the link is an
- * invite or it's genuinely your move; win/loss/draw titles once it's over.
+ * Status-aware share title for the game invite template: "[Game] — Your Turn"
+ * whenever it's an invite or genuinely your move; win/loss/draw once it's over.
  */
 function gameOgTitle(
   status: GameStatus | null,
+  gameLabel: string,
   isRps: boolean,
   isRedBlack: boolean,
   state: TicTacToeState | null,
@@ -105,7 +102,7 @@ function gameOgTitle(
   rbState: RedBlackState | null,
   myMarker: Marker | null,
 ): string {
-  if (status === "waiting") return "Recess — Your Turn";
+  if (status === "waiting") return `${gameLabel} — Your Turn`;
   if (status === "abandoned") return "Recess — This game went quiet";
   if (status === "completed") {
     const winner = isRps
@@ -113,31 +110,28 @@ function gameOgTitle(
       : isRedBlack
         ? (rbState?.matchWinner ?? null)
         : (state?.winner ?? null);
-    if (winner === myMarker) return "Recess — You Win!";
-    if (winner === null) return "Recess — It's a Draw";
-    return "Recess — Your Friend Wins";
+    if (winner === myMarker) return `${gameLabel} — You Win!`;
+    if (winner === null) return `${gameLabel} — It's a Draw`;
+    return `${gameLabel} — Your Friend Wins`;
   }
   // in_progress
-  if (isRps) return "Recess — Your Turn";
+  if (isRps) return `${gameLabel} — Your Turn`;
   if (isRedBlack) {
     // Only the guesser (O) ever has a turn in Red or Black.
     return rbState?.phase === "picking" && myMarker === "O"
-      ? "Recess — Your Turn"
-      : "Recess — Waiting on Your Friend";
+      ? `${gameLabel} — Your Turn`
+      : `${gameLabel} — Waiting on Your Friend`;
   }
   return state?.turn === myMarker
-    ? "Recess — Your Turn"
-    : "Recess — Waiting on Your Friend";
+    ? `${gameLabel} — Your Turn`
+    : `${gameLabel} — Waiting on Your Friend`;
 }
 
-function gameOgDescription(status: GameStatus | null, gameLabel: string): string {
-  if (status === "waiting") {
-    return `You've been challenged to a game of Recess (${gameLabel}). Tap to play — silence is safe here.`;
-  }
+function gameOgDescription(status: GameStatus | null): string {
   if (status === "abandoned") {
-    return `A game of Recess (${gameLabel}) went quiet after 48 hours. Start a fresh one — silence is safe here.`;
+    return "This game went quiet after 48 hours. Start a fresh one — silence is safe here.";
   }
-  return `A game of Recess (${gameLabel}) is waiting for you. Tap to play — silence is safe here.`;
+  return OG_CHALLENGE_DESCRIPTION;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,11 +281,14 @@ export default function GamePage() {
   }, [isOver, status, registerPlay]);
 
   // Keep the tab title + OG tags fresh for link previews (WhatsApp, Instagram,
-  // browsers re-sharing the link, etc.). Crawlers that don't run JS get their
-  // tags from the index.html defaults or the production server instead.
+  // browsers re-sharing the link, etc.). Template 1 (the game invite card):
+  // status-aware title, the shared challenge description, and this game's
+  // board thumbnail. Crawlers that don't run JS get the static defaults from
+  // index.html (Template 2 on the root, or the head script's swap).
   useEffect(() => {
     const title = gameOgTitle(
       status,
+      gameLabel,
       isRps,
       isRedBlack,
       state,
@@ -299,19 +296,16 @@ export default function GamePage() {
       rbState,
       myMarker,
     );
-    const description = gameOgDescription(status, gameLabel);
-    document.title = title;
-    setMetaTag("property", "og:title", title);
-    setMetaTag("name", "twitter:title", title);
-    setMetaTag("property", "og:description", description);
-    setMetaTag("name", "twitter:description", description);
-    if (typeof window !== "undefined") {
-      const origin = window.location.origin;
-      setMetaTag("property", "og:image", `${origin}/og-image.png`);
-      setMetaTag("name", "twitter:image", `${origin}/og-image.png`);
-      setMetaTag("property", "og:url", shareUrl);
-    }
-  }, [status, isRps, isRedBlack, state, rpsState, rbState, myMarker, gameLabel, shareUrl]);
+    applyOgMeta(
+      {
+        title,
+        description: gameOgDescription(status),
+        image: OG_GAME_IMAGES[gameType] ?? OG_BRAND_IMAGE,
+        imageAlt: `A game of ${gameLabel} waiting for you.`,
+      },
+      shareUrl,
+    );
+  }, [status, isRps, isRedBlack, state, rpsState, rbState, myMarker, gameLabel, gameType, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
