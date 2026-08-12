@@ -176,14 +176,16 @@ check(
   fresh.state,
 );
 
-// --- RPS: picks stay masked until both are in -------------------------------
+// --- RPS: full best-of-3 match — picks masked until both are in -------------
 
-console.log("\n[RPS] Create + join + masking check");
+console.log("\n[RPS] Create + join, then a full best-of-3 match");
 const rps = await m<{ slug: string }>(A, "games:createGame", {
   gameType: "rock_paper_scissors",
   deviceToken: tA,
 });
 await m(B, "games:joinGame", { slug: rps.slug, deviceToken: tB });
+
+console.log("  Round 1 — A picks rock; masking is verified before B responds");
 await m(A, "games:submitMove", { slug: rps.slug, deviceToken: tA, pick: "rock" });
 
 const aView = await q<{ state: { picks: { X: unknown; O: unknown } }; me: { picked: boolean } }>(
@@ -208,20 +210,71 @@ check(
   bView,
 );
 
-await m(B, "games:submitMove", { slug: rps.slug, deviceToken: tB, pick: "scissors" });
-const resolved = await q<{
-  state: { winner: string; picks: { X: unknown; O: unknown }; scores: { X: number; O: number } };
-}>(A, "games:getGameState", { slug: rps.slug, deviceToken: tA });
-check("round resolves — rock beats scissors", resolved.state.winner === "X", resolved.state.winner);
+const r1 = await m<{
+  state: {
+    winner: string;
+    round: number;
+    picks: { X: unknown; O: unknown };
+    scores: { X: number; O: number };
+  };
+}>(B, "games:submitMove", { slug: rps.slug, deviceToken: tB, pick: "scissors" });
 check(
-  "picks are revealed once resolved",
-  resolved.state.picks.X === "rock" && resolved.state.picks.O === "scissors",
-  resolved.state.picks,
+  "round 1 resolves — rock beats scissors, picks revealed, 1-0",
+  r1.state.winner === "X" &&
+    r1.state.round === 1 &&
+    r1.state.picks.X === "rock" &&
+    r1.state.picks.O === "scissors" &&
+    r1.state.scores.X === 1,
+  r1.state,
 );
+
+console.log("  Round 2 — a draw replays the round with no score change");
+await m(A, "games:submitMove", { slug: rps.slug, deviceToken: tA, pick: "rock" });
+const draw = await m<{
+  state: {
+    winner: string;
+    round: number;
+    scores: { X: number; O: number };
+    matchWinner: string | null;
+  };
+}>(B, "games:submitMove", { slug: rps.slug, deviceToken: tB, pick: "rock" });
 check(
-  "score is 1-0",
-  resolved.state.scores.X === 1 && resolved.state.scores.O === 0,
-  resolved.state.scores,
+  "draw replays round 2, scores still 1-0",
+  draw.state.winner === "draw" &&
+    draw.state.round === 2 &&
+    draw.state.scores.X === 1 &&
+    draw.state.matchWinner === null,
+  draw.state,
+);
+
+console.log("  Round 2 replay — A takes the match 2-0");
+await m(A, "games:submitMove", { slug: rps.slug, deviceToken: tA, pick: "paper" });
+const r2 = await m<{
+  state: {
+    matchWinner: string | null;
+    round: number;
+    scores: { X: number; O: number };
+    picks: { X: unknown; O: unknown };
+  };
+}>(B, "games:submitMove", { slug: rps.slug, deviceToken: tB, pick: "rock" });
+check(
+  "A wins the match at two round wins (2-0)",
+  r2.state.matchWinner === "X" &&
+    r2.state.round === 2 &&
+    r2.state.scores.X === 2 &&
+    r2.state.picks.X === "paper" &&
+    r2.state.picks.O === "rock",
+  r2.state,
+);
+
+const rpsDone = await q<{ status: string }>(A, "games:getGameState", {
+  slug: rps.slug,
+  deviceToken: tA,
+});
+check("RPS game is completed", rpsDone.status === "completed", rpsDone.status);
+await expectError(
+  m(A, "games:submitMove", { slug: rps.slug, deviceToken: tA, pick: "rock" }),
+  "invalid_move",
 );
 
 // --- Red or Black: server-side draw, instant reveal -------------------------
@@ -248,31 +301,73 @@ check(
   rbRes.state,
 );
 
-// --- Pong: serve visible, return resolves the point -------------------------
+// --- Pong: full match — first to 7, the serve is always visible -------------
 
-console.log("\n[Pong] serve in flight, return resolves the point");
+console.log("\n[Pong] Create + join, then a full 7-point match");
 const pg = await m<{ slug: string }>(A, "games:createGame", {
   gameType: "pong",
   deviceToken: tA,
 });
 await m(B, "games:joinGame", { slug: pg.slug, deviceToken: tB });
-const serve = await m<{ state: { phase: string; turn: string; serve: { angle: number } } }>(
-  A,
-  "games:submitMove",
-  { slug: pg.slug, deviceToken: tA, angle: 30, power: 2 },
-);
+
+interface PointState {
+  phase: string;
+  scores: { X: number; O: number };
+  matchWinner: string | null;
+  serve: { angle: number } | null;
+}
+let finalPoint: PointState | null = null;
+for (let i = 1; i <= 7; i++) {
+  // A serves down the middle; B's wild return (+45°) always misses the mirror
+  // window, so A scores every point and the match resolves deterministically.
+  const serve = await m<{ state: PointState }>(A, "games:submitMove", {
+    slug: pg.slug,
+    deviceToken: tA,
+    angle: 0,
+    power: 1,
+  });
+  if (i === 1) {
+    check(
+      "serve in flight and visible to the returner",
+      serve.state.phase === "return" && serve.state.serve?.angle === 0,
+      serve.state,
+    );
+  }
+  const point = await m<{ state: PointState }>(B, "games:submitMove", {
+    slug: pg.slug,
+    deviceToken: tB,
+    angle: 45,
+    power: 1,
+  });
+  finalPoint = point.state;
+  if (i < 7) {
+    check(
+      `point ${i} to A (${i}-0)`,
+      point.state.phase === "point_over" &&
+        point.state.scores.X === i &&
+        point.state.scores.O === 0,
+      point.state.scores,
+    );
+  }
+}
+
 check(
-  "serve in flight and visible to the returner",
-  serve.state.phase === "return" && serve.state.serve?.angle === 30,
-  serve.state,
+  "match over at 7-0, first to seven",
+  finalPoint?.phase === "match_over" &&
+    finalPoint?.matchWinner === "X" &&
+    finalPoint?.scores.X === 7 &&
+    finalPoint?.scores.O === 0,
+  finalPoint,
 );
-const point = await m<{
-  state: { phase: string; scores: { X: number; O: number }; lastPoint: { good: boolean } };
-}>(B, "games:submitMove", { slug: pg.slug, deviceToken: tB, angle: -30, power: 2 });
-check(
-  "mirrored return scores the returner",
-  point.state.phase === "point_over" && point.state.lastPoint?.good === true,
-  point.state,
+
+const pgDone = await q<{ status: string }>(A, "games:getGameState", {
+  slug: pg.slug,
+  deviceToken: tA,
+});
+check("Pong game is completed", pgDone.status === "completed", pgDone.status);
+await expectError(
+  m(A, "games:submitMove", { slug: pg.slug, deviceToken: tA, angle: 0, power: 1 }),
+  "invalid_move",
 );
 
 // --- summary ----------------------------------------------------------------
