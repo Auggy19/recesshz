@@ -191,8 +191,20 @@ describe("applyOgMeta", () => {
   });
 
   afterEach(() => {
-    if (savedDoc) globalThis.document = savedDoc;
-    if (savedWindow) globalThis.window = savedWindow;
+    // Restore the pre-test globals unconditionally — when no document/window
+    // existed before (bun test runs files in one process), the stub must be
+    // REMOVED again, or later test files that import DOM-dependent modules
+    // (e.g. sonner's CSS injection) crash against the stub's missing APIs.
+    if (savedDoc) {
+      globalThis.document = savedDoc;
+    } else {
+      delete (globalThis as Record<string, unknown>).document;
+    }
+    if (savedWindow) {
+      globalThis.window = savedWindow;
+    } else {
+      delete (globalThis as Record<string, unknown>).window;
+    }
   });
 
   test("sets the tab title and writes all og/twitter tags", () => {
