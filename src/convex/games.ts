@@ -34,12 +34,19 @@ import type {
 import {
   GAME_TYPE,
   RPS_GAME_TYPE,
+  RED_BLACK_GAME_TYPE,
   RPS_CHOICES,
+  RED_BLACK_CHOICES,
+  applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
+  coinFlip,
+  freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   type Marker,
+  type RedBlackChoice,
+  type RedBlackState,
   type RpsChoice,
   type RpsState,
 } from "./gameLogic";
@@ -66,7 +73,11 @@ function fail(code: ErrorCode, message: string): never {
   throw new ConvexError({ code, message });
 }
 
-const SUPPORTED_GAME_TYPES = new Set<string>([GAME_TYPE, RPS_GAME_TYPE]);
+const SUPPORTED_GAME_TYPES = new Set<string>([
+  GAME_TYPE,
+  RPS_GAME_TYPE,
+  RED_BLACK_GAME_TYPE,
+]);
 
 function freshStateFor(gameType: string): unknown {
   switch (gameType) {
@@ -74,6 +85,8 @@ function freshStateFor(gameType: string): unknown {
       return freshTicTacToeState();
     case RPS_GAME_TYPE:
       return freshRpsState();
+    case RED_BLACK_GAME_TYPE:
+      return freshRedBlackState();
     default:
       return fail(
         "unsupported_game",
@@ -154,7 +167,7 @@ export const createGame = mutation({
     if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
-        `"${gameType}" isn't available yet — only Tic Tac Toe and Rock Paper Scissors are supported in this build.`,
+        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, and Red or Black are supported in this build.`,
       );
     }
     if (!deviceToken || deviceToken.length < 8) {
@@ -319,7 +332,13 @@ export const submitMove = mutation({
     deviceToken: v.string(),
     cell: v.optional(v.number()),
     pick: v.optional(
-      v.union(v.literal("rock"), v.literal("paper"), v.literal("scissors")),
+      v.union(
+        v.literal("rock"),
+        v.literal("paper"),
+        v.literal("scissors"),
+        v.literal("red"),
+        v.literal("black"),
+      ),
     ),
   },
   handler: async (ctx, { slug, deviceToken, cell, pick }) => {
@@ -348,7 +367,15 @@ export const submitMove = mutation({
     }
 
     if (game.gameType === RPS_GAME_TYPE) {
-      return await submitRpsPick(ctx, game, player, pick);
+      return await submitRpsPick(ctx, game, player, pick as RpsChoice | undefined);
+    }
+    if (game.gameType === RED_BLACK_GAME_TYPE) {
+      return await submitRedBlackGuess(
+        ctx,
+        game,
+        player,
+        pick as RedBlackChoice | undefined,
+      );
     }
 
     // Tic Tac Toe — cell-based move.
@@ -430,6 +457,62 @@ async function submitRpsPick(
   });
 
   return { ok: true, state: maskRpsState(outcome.state) };
+}
+
+/**
+ * Red or Black move: the responder (O) guesses a color. The server draws the
+ * card outcome itself with a fair 50/50 and resolves the round instantly —
+ * the client never supplies or sees the draw before the guess is locked in.
+ * Only O (the guesser) may submit; X is the host and just watches.
+ */
+async function submitRedBlackGuess(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  guess: RedBlackChoice | undefined,
+) {
+  if (!guess || !RED_BLACK_CHOICES.includes(guess)) {
+    fail("invalid_move", "Pick red or black.");
+  }
+  // Hard rule: only the responder guesses — the initiator is the host and
+  // never submits a move.
+  if (player.marker !== "O") {
+    fail(
+      "invalid_move",
+      "You're the host — your friend picks the color, you watch the reveal.",
+    );
+  }
+
+  const state = game.state as RedBlackState;
+  if (state.matchWinner) {
+    fail("invalid_move", "This match is already over.");
+  }
+  if (state.phase === "picking" && state.guess !== null) {
+    fail(
+      "invalid_move",
+      "You already guessed this round — the reveal is on its way.",
+    );
+  }
+
+  // Server-side draw: cryptographically fair 50/50, never from the client.
+  const outcome = applyRedBlackGuess(state, guess, coinFlip());
+  const now = Date.now();
+
+  await ctx.db.insert("moves", {
+    gameId: game._id,
+    playerId: player._id,
+    payload: { guess, marker: player.marker, round: state.round },
+    createdAt: now,
+  });
+  await ctx.db.patch(game._id, {
+    state: outcome.state,
+    status: outcome.over
+      ? ("completed" as GameStatus)
+      : ("in_progress" as GameStatus),
+    updatedAt: now,
+  });
+
+  return { ok: true, state: outcome.state };
 }
 
 // ---------------------------------------------------------------------------

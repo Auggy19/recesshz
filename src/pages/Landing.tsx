@@ -54,6 +54,11 @@ function urlGameToType(raw: string | null): string | null {
     case "rock_paper_scissors":
     case "rps":
       return "rock_paper_scissors";
+    case "red-or-black":
+    case "red_or_black":
+    case "redblack":
+    case "rnb":
+      return "red_or_black";
     default:
       return null;
   }
@@ -69,11 +74,6 @@ function apiErrorMessage(err: unknown): string | null {
 }
 
 const upcomingGames: GameCard[] = [
-  {
-    name: "Red or Black",
-    blurb: "Pick a color. No — the other one.",
-    art: <RedOrBlackArt className="w-full max-w-[92px]" />,
-  },
   {
     name: "Twenty Questions",
     blurb: "Yes. No. Yes again. Got it!",
@@ -341,6 +341,37 @@ export default function Landing() {
             </span>
           </button>
 
+          {/* Red or Black — the third live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("red_or_black")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Ready to play
+            </div>
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+              <RedOrBlackArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Red or Black</h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Your friend picks a color, the server deals the card, and the
+                reveal lands in an instant. Best of three — guess right to take
+                a round.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+              {creating === "red_or_black" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
           {/* Coming soon — each game gets its illustration */}
           {upcomingGames.map((game) => (
             <div
@@ -399,6 +430,7 @@ export default function Landing() {
                 [
                   ["tic_tac_toe", "Tic Tac Toe"],
                   ["rock_paper_scissors", "RPS"],
+                  ["red_or_black", "Red/Black"],
                 ] as const
               ).map(([value, label]) => (
                 <button

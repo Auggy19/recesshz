@@ -1,7 +1,11 @@
 import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { RockPaperScissorsArt, TicTacToeArt } from "@/components/GameArt";
+import {
+  RedOrBlackArt,
+  RockPaperScissorsArt,
+  TicTacToeArt,
+} from "@/components/GameArt";
 import TicTacToePlay, {
   type Marker,
   type TicTacToeState,
@@ -9,6 +13,9 @@ import TicTacToePlay, {
 import RpsPlay, {
   type RpsChoice,
 } from "@/components/games/RpsPlay";
+import RedBlackPlay, {
+  type RedBlackChoice,
+} from "@/components/games/RedBlackPlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
@@ -50,6 +57,17 @@ interface RpsState {
   rematch?: { slug: string; by: string };
 }
 
+interface RedBlackState {
+  round: number;
+  phase: "picking" | "resolved";
+  guess: RedBlackChoice | null;
+  draw: RedBlackChoice | null;
+  scores: { X: number; O: number };
+  winner: "X" | "O" | null;
+  matchWinner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
 interface ApiError {
   code?: string;
   message?: string;
@@ -81,8 +99,10 @@ function setMetaTag(attr: "property" | "name", key: string, content: string) {
 function gameOgTitle(
   status: GameStatus | null,
   isRps: boolean,
+  isRedBlack: boolean,
   state: TicTacToeState | null,
   rpsState: RpsState | null,
+  rbState: RedBlackState | null,
   myMarker: Marker | null,
 ): string {
   if (status === "waiting") return "Recess — Your Turn";
@@ -90,13 +110,21 @@ function gameOgTitle(
   if (status === "completed") {
     const winner = isRps
       ? (rpsState?.matchWinner ?? null)
-      : (state?.winner ?? null);
+      : isRedBlack
+        ? (rbState?.matchWinner ?? null)
+        : (state?.winner ?? null);
     if (winner === myMarker) return "Recess — You Win!";
     if (winner === null) return "Recess — It's a Draw";
     return "Recess — Your Friend Wins";
   }
   // in_progress
   if (isRps) return "Recess — Your Turn";
+  if (isRedBlack) {
+    // Only the guesser (O) ever has a turn in Red or Black.
+    return rbState?.phase === "picking" && myMarker === "O"
+      ? "Recess — Your Turn"
+      : "Recess — Waiting on Your Friend";
+  }
   return state?.turn === myMarker
     ? "Recess — Your Turn"
     : "Recess — Waiting on Your Friend";
@@ -221,16 +249,29 @@ export default function GamePage() {
   const game = query.status === "success" ? query.data : null;
   const gameType = game?.gameType ?? "tic_tac_toe";
   const isRps = gameType === "rock_paper_scissors";
+  const isRedBlack = gameType === "red_or_black";
+  // RPS and Red or Black share the same match shape (rounds + scores).
+  const matchGame = isRps || isRedBlack;
   const status: GameStatus | null = game?.status ?? null;
   const state = (game?.state as TicTacToeState) ?? null;
   const rpsState = (game?.state as RpsState) ?? null;
+  const rbState = (game?.state as RedBlackState) ?? null;
   const myMarker: Marker | null = game?.me?.marker ?? me?.marker ?? null;
+  const matchWinner: Marker | null = matchGame
+    ? isRps
+      ? (rpsState?.matchWinner ?? null)
+      : (rbState?.matchWinner ?? null)
+    : null;
 
-  const isOver = isRps
-    ? (rpsState?.matchWinner ?? null) !== null
+  const isOver = matchGame
+    ? matchWinner !== null
     : state !== null && (state.winner !== null || state.draw);
 
-  const gameLabel = isRps ? "Rock Paper Scissors" : "Tic Tac Toe";
+  const gameLabel = isRps
+    ? "Rock Paper Scissors"
+    : isRedBlack
+      ? "Red or Black"
+      : "Tic Tac Toe";
 
   // Record the streak exactly once when a game completes — the ref guards
   // against the reactive query re-delivering the same terminal state, while
@@ -249,7 +290,15 @@ export default function GamePage() {
   // browsers re-sharing the link, etc.). Crawlers that don't run JS get their
   // tags from the index.html defaults or the production server instead.
   useEffect(() => {
-    const title = gameOgTitle(status, isRps, state, rpsState, myMarker);
+    const title = gameOgTitle(
+      status,
+      isRps,
+      isRedBlack,
+      state,
+      rpsState,
+      rbState,
+      myMarker,
+    );
     const description = gameOgDescription(status, gameLabel);
     document.title = title;
     setMetaTag("property", "og:title", title);
@@ -262,7 +311,7 @@ export default function GamePage() {
       setMetaTag("name", "twitter:image", `${origin}/og-image.png`);
       setMetaTag("property", "og:url", shareUrl);
     }
-  }, [status, isRps, state, rpsState, myMarker, gameLabel, shareUrl]);
+  }, [status, isRps, isRedBlack, state, rpsState, rbState, myMarker, gameLabel, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
@@ -290,6 +339,16 @@ export default function GamePage() {
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That pick didn't go through.");
+      return false;
+    }
+  };
+
+  const handleGuess = async (guess: RedBlackChoice): Promise<boolean> => {
+    try {
+      await submitMove({ slug, deviceToken, pick: guess });
+      return true;
+    } catch (err) {
+      setMoveError(getApiError(err).message ?? "That guess didn't go through.");
       return false;
     }
   };
@@ -404,8 +463,19 @@ export default function GamePage() {
 
   const isWaiting = status === "waiting";
 
-  const resultTitle = isRps
-    ? rpsState!.matchWinner === myMarker
+  const myScore = matchGame
+    ? isRps
+      ? rpsState!.scores[myMarker!]
+      : rbState!.scores[myMarker!]
+    : 0;
+  const oppScore = matchGame
+    ? isRps
+      ? rpsState!.scores[myMarker === "X" ? "O" : "X"]
+      : rbState!.scores[myMarker === "X" ? "O" : "X"]
+    : 0;
+
+  const resultTitle = matchGame
+    ? matchWinner === myMarker
       ? "You win the match!"
       : "Your friend wins the match"
     : state.winner
@@ -414,11 +484,9 @@ export default function GamePage() {
         : "Your friend wins"
       : "It's a draw";
 
-  const resultSubtitle = isRps
-    ? `Final score — you ${rpsState!.scores[myMarker!]} · friend ${
-        rpsState!.scores[myMarker === "X" ? "O" : "X"]
-      }. ${
-        rpsState!.matchWinner === myMarker
+  const resultSubtitle = matchGame
+    ? `Final score — you ${myScore} · friend ${oppScore}. ${
+        matchWinner === myMarker
           ? "Silence never felt so good."
           : "Rematch? The score is right there."
       }`
@@ -430,7 +498,11 @@ export default function GamePage() {
 
   // If the opponent started a rematch, offer to follow them; otherwise the
   // usual Play Again button (which also covers rematches I started myself).
-  const rematch = (isRps ? rpsState?.rematch : state.rematch) ?? null;
+  const rematch = matchGame
+    ? isRps
+      ? rpsState?.rematch
+      : rbState?.rematch
+    : (state.rematch ?? null);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -455,6 +527,8 @@ export default function GamePage() {
               <div className="hidden shrink-0 rounded-xl border border-border bg-white p-2 sm:block">
                 {isRps ? (
                   <RockPaperScissorsArt className="w-16" />
+                ) : isRedBlack ? (
+                  <RedOrBlackArt className="w-16" />
                 ) : (
                   <TicTacToeArt className="w-16" />
                 )}
@@ -466,7 +540,9 @@ export default function GamePage() {
                 <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                   {isRps
                     ? "You're X. Best of three — make your pick when they join."
-                    : "You're X and play first. Your board waits."}
+                    : isRedBlack
+                      ? "You're the host. Your friend picks red or black — you watch the reveal."
+                      : "You're X and play first. Your board waits."}
                 </p>
               </div>
             </div>
@@ -516,6 +592,13 @@ export default function GamePage() {
               myMarker={myMarker!}
               picked={game.me?.picked}
               onPick={handlePick}
+            />
+          ) : isRedBlack ? (
+            <RedBlackPlay
+              state={rbState!}
+              status={status}
+              myMarker={myMarker!}
+              onGuess={handleGuess}
             />
           ) : (
             <TicTacToePlay

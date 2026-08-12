@@ -2,9 +2,9 @@
 // Recess game rules.
 //
 // This module is intentionally standalone (pure functions, no Convex imports)
-// so the same pattern can be cloned to add Red or Black, Twenty Questions, or
-// Truth or Dare: write a `fresh<Game>State()` and an `apply<Game>Move()` for
-// the new game type and wire it into `games.ts`.
+// so the same pattern can be cloned to add Twenty Questions or Truth or Dare:
+// write a `fresh<Game>State()` and an `apply<Game>Move()` for the new game
+// type and wire it into `games.ts`.
 // ---------------------------------------------------------------------------
 
 import type { TicTacToeState } from "./schema";
@@ -196,6 +196,106 @@ export function applyRpsPick(
       picks,
       scores,
       winner: outcome,
+      phase: "resolved",
+      matchWinner,
+    },
+    over: matchWinner !== null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Red or Black rules — best of 3.
+//
+// The responder (O) guesses "red" or "black"; the server draws the card
+// outcome (never the client), and a correct guess scores O while a miss
+// scores X (the host). First to two round wins takes the match — the same
+// scoring shape as Rock Paper Scissors.
+// ---------------------------------------------------------------------------
+
+export const RED_BLACK_GAME_TYPE = "red_or_black" as const;
+
+export type RedBlackChoice = "red" | "black";
+export const RED_BLACK_CHOICES: RedBlackChoice[] = ["red", "black"];
+
+export interface RedBlackState {
+  /** Current round number (1..3). Every round has a winner, so it advances. */
+  round: number;
+  /** picking = waiting for O's guess; resolved = guess + draw revealed. */
+  phase: "picking" | "resolved";
+  /** O's guess for the current round (null while picking). */
+  guess: RedBlackChoice | null;
+  /** The server's draw for the current round (null while picking). */
+  draw: RedBlackChoice | null;
+  scores: { X: number; O: number };
+  /** Who took the last resolved round. */
+  winner: "X" | "O" | null;
+  /** First to two round wins takes the match. */
+  matchWinner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+export function freshRedBlackState(): RedBlackState {
+  return {
+    round: 1,
+    phase: "picking",
+    guess: null,
+    draw: null,
+    scores: { X: 0, O: 0 },
+    winner: null,
+    matchWinner: null,
+  };
+}
+
+/**
+ * A cryptographically fair 50/50 draw. Called server-side only — the client
+ * never supplies or sees the outcome before the guess is locked in.
+ */
+export function coinFlip(): RedBlackChoice {
+  return (crypto.getRandomValues(new Uint8Array(1))[0] & 1) === 0
+    ? "red"
+    : "black";
+}
+
+export interface RedBlackOutcome {
+  state: RedBlackState;
+  over: boolean;
+}
+
+/**
+ * Apply O's guess against the server's draw. Callers validate first (game in
+ * progress, valid guess, guessing player is O, match not over). A resolved
+ * round means the previous result is on screen — the next guess advances to
+ * the following round and then resolves immediately (there is no replay:
+ * every round has a winner).
+ */
+export function applyRedBlackGuess(
+  current: RedBlackState,
+  guess: RedBlackChoice,
+  draw: RedBlackChoice,
+): RedBlackOutcome {
+  let base: RedBlackState = current;
+  if (base.phase === "resolved") {
+    base = {
+      ...base,
+      round: base.round + 1,
+      phase: "picking",
+      guess: null,
+      draw: null,
+      winner: null,
+    };
+  }
+
+  const winner: "X" | "O" = guess === draw ? "O" : "X";
+  const scores = { ...base.scores, [winner]: base.scores[winner] + 1 };
+  const matchWinner: Marker | null = scores[winner] >= 2 ? winner : null;
+
+  return {
+    state: {
+      ...base,
+      guess,
+      draw,
+      scores,
+      winner,
       phase: "resolved",
       matchWinner,
     },

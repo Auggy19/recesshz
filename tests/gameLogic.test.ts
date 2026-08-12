@@ -8,10 +8,13 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
   beats,
+  coinFlip,
   findWinningLine,
+  freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   isBoardFull,
@@ -215,5 +218,85 @@ describe("rock paper scissors", () => {
     expect(masked.picks.X).toBeNull();
     expect(masked.picks.O).toBeNull();
     expect(pickX.picks.X).toBe("rock"); // server-side truth (never read by clients)
+  });
+});
+
+// --- Red or Black -----------------------------------------------------------
+
+describe("red or black", () => {
+  test("fresh state is round 1, picking, nothing revealed", () => {
+    const s = freshRedBlackState();
+    expect(s.round).toBe(1);
+    expect(s.phase).toBe("picking");
+    expect(s.guess).toBeNull();
+    expect(s.draw).toBeNull();
+    expect(s.scores).toEqual({ X: 0, O: 0 });
+    expect(s.winner).toBeNull();
+    expect(s.matchWinner).toBeNull();
+  });
+
+  test("a correct guess scores O and resolves the round instantly", () => {
+    const { state, over } = applyRedBlackGuess(
+      freshRedBlackState(),
+      "red",
+      "red",
+    );
+    expect(over).toBe(false);
+    expect(state.phase).toBe("resolved");
+    expect(state.winner).toBe("O");
+    expect(state.scores).toEqual({ X: 0, O: 1 });
+    expect(state.guess).toBe("red");
+    expect(state.draw).toBe("red");
+  });
+
+  test("a wrong guess scores X (the host)", () => {
+    const { state } = applyRedBlackGuess(freshRedBlackState(), "red", "black");
+    expect(state.winner).toBe("X");
+    expect(state.scores).toEqual({ X: 1, O: 0 });
+    expect(state.phase).toBe("resolved");
+  });
+
+  test("the outcome depends only on guess vs draw", () => {
+    expect(
+      applyRedBlackGuess(freshRedBlackState(), "black", "black").state.winner,
+    ).toBe("O");
+    expect(
+      applyRedBlackGuess(freshRedBlackState(), "black", "red").state.winner,
+    ).toBe("X");
+  });
+
+  test("after a resolved round the next guess advances the round", () => {
+    let s = applyRedBlackGuess(freshRedBlackState(), "red", "red").state;
+    s = applyRedBlackGuess(s, "black", "red").state;
+    expect(s.round).toBe(2);
+    expect(s.phase).toBe("resolved");
+    expect(s.scores).toEqual({ X: 1, O: 1 });
+  });
+
+  test("best of three: the guesser wins at two correct guesses", () => {
+    let s = freshRedBlackState();
+    s = applyRedBlackGuess(s, "red", "red").state;
+    const { state, over } = applyRedBlackGuess(s, "black", "black");
+    expect(state.matchWinner).toBe("O");
+    expect(state.scores).toEqual({ X: 0, O: 2 });
+    expect(state.phase).toBe("resolved");
+    expect(over).toBe(true);
+  });
+
+  test("best of three: the host wins when the guesser keeps missing", () => {
+    let s = freshRedBlackState();
+    s = applyRedBlackGuess(s, "red", "black").state;
+    const { state, over } = applyRedBlackGuess(s, "red", "black");
+    expect(state.matchWinner).toBe("X");
+    expect(state.scores).toEqual({ X: 2, O: 0 });
+    expect(over).toBe(true);
+  });
+
+  test("coinFlip is a fair two-outcome draw", () => {
+    // A draw must always be a valid color — the caller decides fairness.
+    for (let i = 0; i < 200; i++) {
+      const c = coinFlip();
+      expect(c === "red" || c === "black").toBe(true);
+    }
   });
 });
