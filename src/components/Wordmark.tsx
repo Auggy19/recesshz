@@ -32,7 +32,7 @@ export function Wordmark({ tone = "light", size = "md", className }: WordmarkPro
   return (
     <span
       className={cn(
-        "inline-flex select-none items-baseline font-black tracking-tight",
+        "inline-flex select-none items-baseline font-display font-black tracking-tight",
         s.word,
         className,
       )}

@@ -186,7 +186,12 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
+      <section className="relative mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
+        {/* Ambient warm glow behind the hero — sets the premium mood */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[36rem] bg-[radial-gradient(62%_55%_at_50%_0%,rgba(245,166,35,0.22),transparent_72%)]"
+        />
         {/* The app icon — front and center, like a launcher tile */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -208,7 +213,7 @@ export default function Landing() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="mx-auto inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-xs font-semibold text-muted-foreground"
+          className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/20 bg-card/80 px-4 py-1.5 text-xs font-semibold text-muted-foreground shadow-chip backdrop-blur-sm"
         >
           <Sparkles className="size-3.5 text-primary" />
           Link-based &middot; No login &middot; Take your turn whenever
@@ -218,10 +223,12 @@ export default function Landing() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.05 }}
-          className="mx-auto mt-6 max-w-2xl text-5xl font-black tracking-tight sm:text-6xl"
+          className="mx-auto mt-6 max-w-2xl font-display text-5xl font-black tracking-tight sm:text-6xl"
         >
           <Wordmark size="xl" className="justify-center" />
-          <span className="mt-3 block text-foreground">Silence is safe here.</span>
+          <span className="mt-3 block bg-gradient-to-b from-[#E08F14] via-primary to-[#F9C877] bg-clip-text text-transparent">
+            Silence is safe here.
+          </span>
         </motion.h1>
 
         <motion.p
@@ -242,7 +249,7 @@ export default function Landing() {
         >
           <Button
             size="lg"
-            className="h-12 rounded-full px-7 text-base font-bold shadow-lg shadow-primary/25"
+            className="h-12 rounded-full px-7 text-base font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0"
             onClick={() => handleCreateGame("tic_tac_toe")}
             disabled={creating !== null}
           >
@@ -260,7 +267,7 @@ export default function Landing() {
           </Button>
           <a
             href="#games"
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-6 text-base font-semibold text-foreground transition-colors hover:bg-accent"
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-6 text-base font-semibold text-foreground shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent"
           >
             See the games
             <ArrowRight className="size-4" />
@@ -279,7 +286,7 @@ export default function Landing() {
               aria-hidden
               className="absolute inset-4 rounded-[2.5rem] bg-primary/20 blur-2xl"
             />
-            <div className="relative rounded-[2.5rem] border border-border bg-card p-6 shadow-xl shadow-primary/10">
+            <div className="relative rounded-[2.5rem] border border-border bg-card p-6 shadow-lift">
               <HeroArt className="w-full" />
             </div>
           </div>
@@ -298,12 +305,12 @@ export default function Landing() {
             type="button"
             onClick={() => handleCreateGame("tic_tac_toe")}
             disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
           >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
               Ready to play
             </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
               <TicTacToeArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -313,7 +320,7 @@ export default function Landing() {
                 it&apos;s your turn — your board waits for you.
               </p>
             </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
               {creating === "tic_tac_toe" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -328,12 +335,12 @@ export default function Landing() {
             type="button"
             onClick={() => handleCreateGame("rock_paper_scissors")}
             disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
           >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
               Ready to play
             </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
               <RockPaperScissorsArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -345,7 +352,7 @@ export default function Landing() {
                 reveal once they&apos;re both in — no peeking, no arguing.
               </p>
             </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
               {creating === "rock_paper_scissors" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -360,12 +367,12 @@ export default function Landing() {
             type="button"
             onClick={() => handleCreateGame("red_or_black")}
             disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
           >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
               Ready to play
             </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
               <RedOrBlackArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -376,7 +383,7 @@ export default function Landing() {
                 a round.
               </p>
             </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
               {creating === "red_or_black" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -391,12 +398,12 @@ export default function Landing() {
             type="button"
             onClick={() => handleCreateGame("pong")}
             disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
           >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
               Ready to play
             </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
               <PongArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -406,7 +413,7 @@ export default function Landing() {
                 return, and chase the rally — first to 7 points takes it.
               </p>
             </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
               {creating === "pong" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -421,12 +428,12 @@ export default function Landing() {
             type="button"
             onClick={() => handleCreateGame("twenty_questions")}
             disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
           >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
               Ready to play
             </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
               <TwentyQuestionsArt className="w-28 sm:w-36" />
             </div>
             <div>
@@ -438,7 +445,7 @@ export default function Landing() {
                 until the guess lands — or the 20 questions run out.
               </p>
             </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
               {creating === "twenty_questions" ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -452,16 +459,16 @@ export default function Landing() {
           {upcomingGames.map((game) => (
             <div
               key={game.name}
-              className="col-span-2 flex flex-col gap-4 rounded-3xl border border-border bg-card/60 p-6 opacity-80 transition-opacity hover:opacity-100"
+              className="col-span-2 flex flex-col gap-4 rounded-3xl border border-dashed border-border bg-card/60 p-6 opacity-80 shadow-soft transition-all hover:-translate-y-0.5 hover:opacity-100"
             >
-              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
                 {game.art}
               </div>
               <div>
                 <span className="inline-flex w-fit rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
                   Coming soon
                 </span>
-                <h3 className="mt-2.5 text-lg font-black tracking-tight">
+                <h3 className="mt-2.5 font-display text-lg font-black tracking-tight">
                   {game.name}
                 </h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -478,10 +485,10 @@ export default function Landing() {
         <motion.div
           {...fadeUp}
           transition={{ duration: 0.4 }}
-          className="flex flex-col items-center gap-5 rounded-3xl border border-border bg-card p-6 text-center sm:flex-row sm:justify-between sm:text-left sm:p-8"
+          className="flex flex-col items-center gap-5 rounded-3xl border border-border bg-card p-6 text-center shadow-soft sm:flex-row sm:justify-between sm:text-left sm:p-8"
         >
           <div>
-            <h2 className="flex items-center justify-center gap-2 text-lg font-black tracking-tight sm:justify-start">
+            <h2 className="flex items-center justify-center gap-2 font-display text-lg font-black tracking-tight sm:justify-start">
               <LogIn className="size-5 text-primary" />
               Have a room code?
             </h2>
@@ -499,9 +506,9 @@ export default function Landing() {
               onChange={(e) => setRoomCode(e.target.value)}
               placeholder="Room code (e.g. sunny-4c)"
               aria-label="Room code"
-              className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+              className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
-            <div className="flex items-center gap-1 rounded-full border border-border bg-background p-1">
+            <div className="flex items-center gap-1 rounded-full border border-border bg-background p-1 shadow-chip">
               {(
                 [
                   ["tic_tac_toe", "Tic Tac Toe"],
@@ -517,7 +524,7 @@ export default function Landing() {
                   onClick={() => setRoomGame(value)}
                   className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
                     roomGame === value
-                      ? "bg-primary text-white"
+                      ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -528,7 +535,7 @@ export default function Landing() {
             <button
               type="submit"
               disabled={creating !== null || roomCode.trim().length === 0}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 text-sm font-bold text-white shadow-btn-amber transition-all hover:-translate-y-0.5 hover:brightness-105 disabled:pointer-events-none disabled:opacity-50"
             >
               {creating ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -546,14 +553,14 @@ export default function Landing() {
         <motion.div
           {...fadeUp}
           transition={{ duration: 0.4 }}
-          className="grid items-center gap-8 overflow-hidden rounded-[2.5rem] border border-border bg-card p-8 sm:p-10 lg:grid-cols-[1.1fr_1fr]"
+          className="grid items-center gap-8 overflow-hidden rounded-[2.5rem] border border-border bg-card p-8 shadow-soft sm:p-10 lg:grid-cols-[1.1fr_1fr]"
         >
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
               <Sparkles className="size-3.5" />
               The Recess mood
             </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+            <h2 className="mt-4 font-display text-3xl font-black tracking-tight sm:text-4xl">
               Play at the pace of a playground.
             </h2>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
@@ -586,7 +593,7 @@ export default function Landing() {
       <section id="how-it-works" className="border-y border-border bg-card/50">
         <div className="mx-auto w-full max-w-5xl px-5 py-16">
           <motion.div {...fadeUp} transition={{ duration: 0.4 }}>
-            <h2 className="text-center text-3xl font-black tracking-tight">
+            <h2 className="text-center font-display text-3xl font-black tracking-tight">
               How Recess works
             </h2>
             <p className="mx-auto mt-2 max-w-md text-center text-sm text-muted-foreground">
@@ -615,9 +622,9 @@ export default function Landing() {
                 key={s.step}
                 {...fadeUp}
                 transition={{ duration: 0.4, delay: 0.08 * i }}
-                className="rounded-3xl bg-card p-6 shadow-sm"
+                className="rounded-3xl bg-card p-6 shadow-soft"
               >
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-black text-white">
+                <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-b from-primary to-primary-deep text-base font-black text-white shadow-btn-amber">
                   {s.step}
                 </div>
                 <h3 className="mt-4 text-lg font-black tracking-tight">{s.title}</h3>
@@ -641,7 +648,7 @@ export default function Landing() {
             <button
               type="button"
               onClick={open}
-              className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+              className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-muted-foreground shadow-chip transition-colors hover:text-foreground"
             >
               📲 Add Recess to Home Screen
             </button>

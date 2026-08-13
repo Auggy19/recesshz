@@ -190,7 +190,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
       </div>
 
       {/* Score bar */}
-      <div className="mx-auto mt-5 flex w-full max-w-sm items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="mx-auto mt-5 flex w-full max-w-sm items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 shadow-soft">
         <span
           className={cn(
             "text-sm font-black",
@@ -215,7 +215,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
       {/* The court — cream, ink outline, amber ball */}
       <div
         className={cn(
-          "relative mx-auto mt-5 w-full max-w-sm overflow-hidden rounded-3xl border-2 border-[#1A1A1A] bg-[#FFF9E5] shadow-sm",
+          "relative mx-auto mt-5 w-full max-w-sm overflow-hidden rounded-3xl border-2 border-[#1A1A1A] bg-[#FFF9E5] shadow-lift ring-1 ring-black/5",
           isWaiting && "opacity-60",
         )}
         style={{ aspectRatio: "7 / 4" }}
@@ -240,7 +240,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
         />
         {/* ball */}
         <div
-          className="absolute size-[18px] rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-sm"
+          className="absolute size-[18px] rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-[0_2px_12px_rgba(245,166,35,0.55)]"
           style={{
             left: `${ballX}%`,
             top: `calc(${ballY}% - 9px)`,
@@ -251,16 +251,16 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
 
       {/* Point reveal */}
       {resolved && last && (
-        <div className="mx-auto mt-5 w-full max-w-sm rounded-3xl border-2 border-border bg-card p-5">
+        <div className="mx-auto mt-5 w-full max-w-sm rounded-3xl border border-primary/30 bg-card p-5 shadow-soft">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-3">
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-3 shadow-chip">
               <span className="text-base font-black">{signed(last.serve.angle)}°</span>
               <span className="text-[11px] font-bold text-muted-foreground">
                 Serve · {POWER_LABELS[last.serve.power]}
               </span>
             </div>
             <span className="text-lg font-black text-muted-foreground">vs</span>
-            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-3">
+            <div className="flex flex-1 flex-col items-center gap-1 rounded-2xl bg-background py-3 shadow-chip">
               <span className="text-base font-black">{signed(last.ret.angle)}°</span>
               <span className="text-[11px] font-bold text-muted-foreground">
                 Return · {POWER_LABELS[last.ret.power]}
@@ -292,7 +292,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
           key={`${state.phase}-${state.turn}`}
           className="mx-auto mt-5 w-full max-w-sm"
         >
-          <div className="rounded-3xl border-2 border-border bg-card p-5">
+          <div className="rounded-3xl border-2 border-border bg-card p-5 shadow-soft">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-muted-foreground">
                 {isMyServe ? "Serve angle" : "Return angle"}
@@ -319,8 +319,8 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
                   className={cn(
                     "flex flex-col items-center gap-0.5 rounded-2xl border-2 px-2 py-2.5 transition-all",
                     power === o.value
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-background hover:border-primary/40",
+                      ? "border-primary bg-primary/10 shadow-glow"
+                      : "border-border bg-background shadow-soft hover:border-primary/40",
                   )}
                 >
                   <span
@@ -341,7 +341,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
               type="button"
               onClick={handleShot}
               disabled={submitting}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep py-3 text-sm font-bold text-white shadow-btn-amber transition-all hover:scale-[1.02] hover:brightness-105 active:scale-95 disabled:opacity-60"
             >
               {submitting && <Loader2 className="size-4 animate-spin" />}
               {isMyServe ? "Serve" : "Return"}

@@ -136,7 +136,7 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
       </div>
 
       {/* Score bar */}
-      <div className="mx-auto mt-5 flex w-full max-w-xs items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="mx-auto mt-5 flex w-full max-w-xs items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 shadow-soft">
         <span
           className={cn(
             "text-sm font-black",
@@ -162,16 +162,16 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
       <div className={cn("mx-auto mt-5 w-full max-w-xs", isWaiting && "opacity-60")}>
         {bothPicked ? (
           // Round resolved — both picks revealed.
-          <div className="rounded-3xl border-2 border-border bg-card p-5">
+          <div className="rounded-3xl border border-primary/30 bg-card p-5 shadow-soft">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4 shadow-chip">
                 {state.picks[myMarker] && (
                   <Gesture pick={state.picks[myMarker]} className="h-14 w-14" />
                 )}
                 <span className="text-xs font-bold text-muted-foreground">You</span>
               </div>
               <span className="text-xl font-black text-muted-foreground">vs</span>
-              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4 shadow-chip">
                 {state.picks[opponentMarker] && (
                   <Gesture pick={state.picks[opponentMarker]} className="h-14 w-14" />
                 )}
@@ -193,9 +193,9 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
           </div>
         ) : hasPicked ? (
           // My pick is in — show mine, hide theirs until they submit.
-          <div className="rounded-3xl border-2 border-dashed border-border bg-card p-5">
+          <div className="rounded-3xl border-2 border-dashed border-border bg-card p-5 shadow-soft">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4 shadow-chip">
                 {myPick ? (
                   <Gesture pick={myPick} className="h-14 w-14" />
                 ) : (
@@ -204,7 +204,7 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
                 <span className="text-xs font-bold text-muted-foreground">You</span>
               </div>
               <span className="text-xl font-black text-muted-foreground">vs</span>
-              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4">
+              <div className="flex flex-1 flex-col items-center gap-2 rounded-2xl bg-background py-4 shadow-chip">
                 <QuestionMark className="h-14 w-14 animate-bounce" />
                 <span className="text-xs font-bold text-muted-foreground">Friend</span>
               </div>
@@ -228,10 +228,10 @@ export default function RpsPlay({ state, status, myMarker, picked, onPick }: Pro
                     disabled={disabled}
                     onClick={() => handlePick(c.value)}
                     className={cn(
-                      "flex aspect-square flex-col items-center justify-center gap-2 rounded-3xl border-2 border-border bg-card transition-all",
+                      "flex aspect-square flex-col items-center justify-center gap-2 rounded-3xl border-2 border-border bg-card shadow-soft transition-all duration-150",
                       canPick &&
                         !disabled &&
-                        "cursor-pointer hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md active:scale-95",
+                        "cursor-pointer hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-glow active:scale-95",
                     )}
                   >
                     <Gesture pick={c.value} className="h-14 w-14 sm:h-16 sm:w-16" />

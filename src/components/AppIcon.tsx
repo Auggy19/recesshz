@@ -31,7 +31,9 @@ export function AppIcon({ variant = "amber", size = "md", className }: AppIconPr
       className={cn(
         "inline-flex select-none items-center justify-center font-black leading-none",
         s.tile,
-        variant === "amber" ? "bg-primary text-white" : "bg-foreground text-primary",
+        variant === "amber"
+          ? "bg-gradient-to-b from-primary to-primary-deep text-white"
+          : "bg-foreground text-primary",
         className,
       )}
     >

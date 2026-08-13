@@ -77,10 +77,10 @@ export default function TicTacToePlay({ state, status, myMarker, onMove }: Props
                 onClick={() => onMove(i)}
                 aria-label={`Cell ${i + 1}${cell ? `, ${cell}` : ""}`}
                 className={cn(
-                  "flex aspect-square items-center justify-center rounded-2xl border transition-all",
+                  "flex aspect-square items-center justify-center rounded-2xl border shadow-soft transition-all duration-150",
                   inWinningLine
-                    ? "border-primary bg-primary/20"
-                    : "border-border bg-card hover:border-primary/60",
+                    ? "border-primary bg-primary/20 shadow-glow"
+                    : "border-border bg-card hover:border-primary/60 hover:shadow-lift",
                   !disabled &&
                     "cursor-pointer hover:-translate-y-0.5 active:scale-95",
                   disabled && !isWaiting && "cursor-default",

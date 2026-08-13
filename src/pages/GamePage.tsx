@@ -208,13 +208,13 @@ function FullPageMessage({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-      <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
+      <div className="w-full max-w-sm rounded-3xl border border-primary/20 bg-card p-8 text-center shadow-lift">
         {icon && (
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-gradient-to-b from-primary/25 to-primary/10 text-primary shadow-chip">
             {icon}
           </div>
         )}
-        <h1 className="text-xl font-black tracking-tight">{title}</h1>
+        <h1 className="font-display text-xl font-black tracking-tight">{title}</h1>
         {body && (
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {body}
@@ -616,7 +616,7 @@ export default function GamePage() {
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-chip transition-all hover:-translate-y-0.5 hover:text-foreground"
           aria-label="Back to Recess"
         >
           <ArrowLeft className="size-4" />
@@ -628,9 +628,14 @@ export default function GamePage() {
       <main className="mx-auto w-full max-w-md px-5 pb-16">
         {/* Share card */}
         {isWaiting && (
-          <div className="mt-6 rounded-3xl border-2 border-dashed border-primary/50 bg-card p-5">
+          <div className="relative mt-6 overflow-hidden rounded-3xl border border-primary/30 bg-card p-5 shadow-soft">
+            {/* Amber gradient hairline across the top */}
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0"
+            />
             <div className="flex items-center gap-3">
-              <div className="hidden shrink-0 rounded-xl border border-border bg-white p-2 sm:block">
+              <div className="hidden shrink-0 rounded-xl border border-border bg-white p-2 shadow-chip sm:block">
                 {isRps ? (
                   <RockPaperScissorsArt className="w-16" />
                 ) : isRedBlack ? (
@@ -663,14 +668,14 @@ export default function GamePage() {
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               Paste it in WhatsApp or any chat. It opens straight into the game.
             </p>
-            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2.5">
+            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2.5 shadow-chip">
               <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
                 {shareUrl}
               </span>
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-transform hover:scale-105"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber transition-transform hover:scale-105"
                 aria-label="Copy link"
               >
                 <Copy className="size-3.5" />
@@ -682,7 +687,7 @@ export default function GamePage() {
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-3 text-sm font-bold text-white shadow-soft transition-all hover:-translate-y-0.5 hover:brightness-105"
             >
               <MessageCircle className="size-4" />
               Share on WhatsApp
@@ -740,13 +745,17 @@ export default function GamePage() {
 
         {/* Result screen: Play Again + inline feedback */}
         {isOver && status === "completed" && (
-          <div className="mt-8 rounded-3xl border border-border bg-card p-6 text-center shadow-sm">
-            <h2 className="text-2xl font-black tracking-tight">{resultTitle}</h2>
+          <div className="relative mt-8 overflow-hidden rounded-3xl border border-primary/25 bg-card p-6 text-center shadow-lift">
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0"
+            />
+            <h2 className="font-display text-2xl font-black tracking-tight">{resultTitle}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{resultSubtitle}</p>
 
             {/* Habit banner — a gentle nudge, only after a finished game */}
             {streak > 0 && (
-              <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-2.5">
+              <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-2.5 shadow-chip">
                 <Flame className="size-4 shrink-0 text-primary" />
                 <p className="text-sm font-bold text-foreground">
                   {streak === 1
@@ -759,7 +768,7 @@ export default function GamePage() {
             {/* Rematch offer from the opponent, else Play Again */}
             {rematch && rematch.by !== deviceToken ? (
               <Button
-                className="mt-5 w-full rounded-full py-6 text-base font-bold"
+                className="mt-5 w-full rounded-full py-6 text-base font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => navigate(`/play/${rematch.slug}`)}
               >
                 <RefreshCw className="size-4" />
@@ -767,7 +776,7 @@ export default function GamePage() {
               </Button>
             ) : (
               <Button
-                className="mt-5 w-full rounded-full py-6 text-base font-bold"
+                className="mt-5 w-full rounded-full py-6 text-base font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0"
                 onClick={handlePlayAgain}
                 disabled={creatingRematch}
               >
@@ -788,14 +797,14 @@ export default function GamePage() {
                   <button
                     type="button"
                     onClick={() => handleFeedback(true)}
-                    className="flex h-10 w-16 items-center justify-center gap-1.5 rounded-full bg-primary text-sm font-bold text-white transition-transform hover:scale-105"
+                    className="flex h-10 w-16 items-center justify-center gap-1.5 rounded-full bg-gradient-to-b from-primary to-primary-deep text-sm font-bold text-white shadow-btn-amber transition-transform hover:scale-105"
                   >
                     <Check className="size-4" /> Yes
                   </button>
                   <button
                     type="button"
                     onClick={() => handleFeedback(false)}
-                    className="flex h-10 w-16 items-center justify-center rounded-full border border-border bg-background text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex h-10 w-16 items-center justify-center rounded-full border border-border bg-background text-sm font-bold text-muted-foreground shadow-chip transition-colors hover:border-primary/40 hover:text-foreground"
                   >
                     No
                   </button>

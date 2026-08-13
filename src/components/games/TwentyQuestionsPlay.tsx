@@ -152,7 +152,7 @@ export default function TwentyQuestionsPlay({
       {/* The game card */}
       <div
         className={cn(
-          "mx-auto mt-5 w-full max-w-xs rounded-3xl border-2 bg-card p-5",
+          "mx-auto mt-5 w-full max-w-xs rounded-3xl border-2 bg-card p-5 shadow-soft",
           isOver ? "border-primary/60" : "border-border",
           isWaiting && "opacity-60",
         )}
@@ -181,12 +181,12 @@ export default function TwentyQuestionsPlay({
                 maxLength={80}
                 placeholder="e.g. a giraffe"
                 aria-label="Your secret"
-                className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+                className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="submit"
                 disabled={submitting || secretInput.trim().length === 0}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 text-sm font-bold text-white shadow-btn-amber transition-all hover:-translate-y-0.5 hover:brightness-105 disabled:pointer-events-none disabled:opacity-50"
               >
                 Lock it in
               </button>
@@ -205,7 +205,7 @@ export default function TwentyQuestionsPlay({
             <p className="text-center text-xs font-bold text-muted-foreground">
               Question {questionCount} of {MAX_QUESTIONS}
             </p>
-            <p className="mt-2 rounded-2xl bg-background px-4 py-3 text-center text-sm font-bold leading-relaxed">
+            <p className="mt-2 rounded-2xl bg-background px-4 py-3 text-center text-sm font-bold leading-relaxed shadow-chip">
               “{state.pendingQuestion}”
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -218,8 +218,8 @@ export default function TwentyQuestionsPlay({
                   className={cn(
                     "h-11 rounded-full text-sm font-bold transition-all",
                     answer === "yes"
-                      ? "bg-primary text-white shadow-lg shadow-primary/25 hover:opacity-90"
-                      : "border border-border bg-background text-foreground hover:bg-accent",
+                      ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber hover:brightness-105"
+                      : "border border-border bg-background text-foreground shadow-chip hover:bg-accent",
                   )}
                 >
                   {answer === "yes" ? "Yes" : "No"}
@@ -252,7 +252,7 @@ export default function TwentyQuestionsPlay({
             </p>
 
             {/* Ask / guess toggle */}
-            <div className="mt-3 flex items-center justify-center gap-1 rounded-full border border-border bg-background p-1">
+            <div className="mt-3 flex items-center justify-center gap-1 rounded-full border border-border bg-background p-1 shadow-chip">
               {(["ask", "guess"] as const).map((m) => (
                 <button
                   key={m}
@@ -262,7 +262,7 @@ export default function TwentyQuestionsPlay({
                   className={cn(
                     "rounded-full px-4 py-1.5 text-xs font-bold transition-colors",
                     mode === m && !(m === "ask" && state.phase === "final")
-                      ? "bg-primary text-white"
+                      ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -280,12 +280,12 @@ export default function TwentyQuestionsPlay({
                   rows={2}
                   placeholder="Yes/no question… e.g. Is it bigger than a breadbox?"
                   aria-label="Your question"
-                  className="min-w-0 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+                  className="min-w-0 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="submit"
                   disabled={submitting || questionInput.trim().length === 0}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 text-sm font-bold text-white shadow-btn-amber transition-all hover:-translate-y-0.5 hover:brightness-105 disabled:pointer-events-none disabled:opacity-50"
                 >
                   Ask
                 </button>
@@ -298,12 +298,12 @@ export default function TwentyQuestionsPlay({
                   maxLength={200}
                   placeholder="Your final guess…"
                   aria-label="Your guess"
-                  className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary"
+                  className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="submit"
                   disabled={submitting || guessInput.trim().length === 0}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 text-sm font-bold text-white shadow-btn-amber transition-all hover:-translate-y-0.5 hover:brightness-105 disabled:pointer-events-none disabled:opacity-50"
                 >
                   Make the guess
                 </button>
@@ -320,14 +320,14 @@ export default function TwentyQuestionsPlay({
 
       {/* Past questions — both players see the transcript */}
       {state.questions.length > 0 && !isWaiting && (
-        <div className="mx-auto mt-3 w-full max-w-xs rounded-2xl border border-border bg-card/60 p-4">
+        <div className="mx-auto mt-3 w-full max-w-xs rounded-2xl border border-border bg-card/60 p-4 shadow-soft">
           <p className="text-xs font-bold text-muted-foreground">
             So far · {state.questions.length} of {MAX_QUESTIONS}
           </p>
           <ul className="mt-2 space-y-1.5">
             {state.questions.map((q, i) => (
               <li key={i} className="flex items-start gap-2 text-xs leading-relaxed">
-                <span className="mt-0.5 shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 font-black text-primary">
+                <span className="mt-0.5 shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 font-black text-primary shadow-chip">
                   {i + 1}
                 </span>
                 <span className="min-w-0 flex-1 text-muted-foreground">
@@ -349,8 +349,8 @@ export default function TwentyQuestionsPlay({
 
       {/* Match over — the reveal */}
       {isOver && !isWaiting && (
-        <div className="mx-auto mt-4 w-full max-w-xs rounded-3xl border-2 border-primary/60 bg-card p-5 text-center shadow-sm">
-          <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-primary/15 text-xl">
+        <div className="mx-auto mt-4 w-full max-w-xs rounded-3xl border-2 border-primary/60 bg-card p-5 text-center shadow-glow">
+          <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-gradient-to-b from-primary/25 to-primary/10 text-xl shadow-chip">
             🎉
           </div>
           <p className="mt-3 text-base font-black tracking-tight">
@@ -380,7 +380,7 @@ export default function TwentyQuestionsPlay({
                   } and it slipped away.`}
           </p>
           {state.secret && (
-            <p className="mt-4 rounded-2xl bg-background px-4 py-3 text-sm font-bold">
+            <p className="mt-4 rounded-2xl bg-background px-4 py-3 text-sm font-bold shadow-chip">
               The secret was:{" "}
               <span className="text-primary">“{state.secret}”</span>
             </p>
