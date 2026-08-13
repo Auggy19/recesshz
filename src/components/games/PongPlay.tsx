@@ -238,13 +238,22 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
             transition: `top 500ms ${COURT_EASE}`,
           }}
         />
-        {/* ball */}
+        {/* ball — travels left/right between the paddles. It glows while a
+            shot is in flight so the travel is easy to track, and gently bobs
+            while parked so the court never looks frozen between points. */}
         <div
-          className="absolute size-[18px] rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-[0_2px_12px_rgba(245,166,35,0.55)]"
+          className={cn(
+            "absolute size-[18px] rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-[0_2px_14px_rgba(245,166,35,0.6)]",
+            inFlight
+              ? "animate-pong-glow"
+              : state.phase === "match_over"
+                ? ""
+                : "animate-recess-bob",
+          )}
           style={{
             left: `${ballX}%`,
             top: `calc(${ballY}% - 9px)`,
-            transition: `left 800ms ${COURT_EASE}, top 800ms ${COURT_EASE}`,
+            transition: `left 950ms ${COURT_EASE}, top 950ms ${COURT_EASE}`,
           }}
         />
       </div>

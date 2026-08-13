@@ -51,6 +51,10 @@
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui,
     sans-serif;
+
+  /* Pong court motion (keyframes at the bottom of this file). */
+  --animate-recess-bob: recess-bob 2.6s ease-in-out infinite;
+  --animate-pong-glow: recess-pong-glow 0.7s ease-in-out infinite;
 }
 
 /* Premium surface shadows — layered (line + ambient + lift) instead of flat.
@@ -196,5 +200,33 @@
     background: color-mix(in srgb, var(--primary) 55%, transparent);
     border: 3px solid transparent;
     background-clip: padding-box;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Pong court motion — the ball's left/right travel is the game's heartbeat,
+   so it needs to read clearly even on slow polling connections.
+   - recess-bob:      gentle idle bob while the ball waits to be served, so
+                      the court never looks frozen between points.
+   - recess-pong-glow: fast amber pulse while a shot is in flight, so the eye
+                      tracks the ball across the court.
+--------------------------------------------------------------------------- */
+@keyframes recess-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes recess-pong-glow {
+  0%,
+  100% {
+    box-shadow: 0 2px 14px rgba(245, 166, 35, 0.6);
+  }
+  50% {
+    box-shadow: 0 2px 28px rgba(245, 166, 35, 1);
   }
 }

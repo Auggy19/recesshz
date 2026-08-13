@@ -65,6 +65,7 @@ const originalGlobals = {
   matchMedia: globalThis.matchMedia,
   requestAnimationFrame: globalThis.requestAnimationFrame,
   cancelAnimationFrame: globalThis.cancelAnimationFrame,
+  ResizeObserver: globalThis.ResizeObserver,
 };
 
 afterAll(() => {
@@ -90,6 +91,9 @@ function freshWindow() {
     matchMedia: (q: string) => dom.matchMedia(q),
     requestAnimationFrame: (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 16),
     cancelAnimationFrame: (id: number) => clearTimeout(id),
+    // Radix's slider measures its thumb with ResizeObserver; happy-dom ships
+    // one on its Window, so expose it here (the suite is order-independent).
+    ResizeObserver: dom.ResizeObserver as unknown as typeof ResizeObserver,
   });
 }
 
