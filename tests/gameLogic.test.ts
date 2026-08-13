@@ -458,7 +458,9 @@ describe("twenty questions", () => {
     let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "Giraffe");
     s = applyTwentyQuestionsQuestion(s, "Is it an animal?");
     s = applyTwentyQuestionsAnswer(s, "yes");
-    const { state, over } = applyTwentyQuestionsGuess(s, " a giraffe ");
+    // A guess that matches after trim + lowercase wins O (the "a " article
+    // would NOT match — normalization is case/whitespace only, never fuzzy).
+    const { state, over } = applyTwentyQuestionsGuess(s, " giraffe ");
     expect(over).toBe(true);
     expect(state.phase).toBe("match_over");
     expect(state.winner).toBe("O");

@@ -796,7 +796,9 @@ describe("submitMove — Twenty Questions", () => {
     const res = (await run(submitMove, db, {
       slug,
       deviceToken: "device-B",
-      guess: " a giraffe ",
+      // Matches the secret "Giraffe" after trim + lowercase — normalization
+      // is case/whitespace only, so "a giraffe" would NOT win this round.
+      guess: " giraffe ",
     })) as { state: { phase: string; winner: string; secret: string } };
     expect(res.state.phase).toBe("match_over");
     expect(res.state.winner).toBe("O");
