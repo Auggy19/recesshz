@@ -97,6 +97,7 @@ function freshWindow() {
 // "convex/react" mock is active when they first load it).
 const { default: GamePage } = await import("../src/pages/GamePage");
 const { default: Landing } = await import("../src/pages/Landing");
+const { default: NotFound } = await import("../src/pages/NotFound");
 
 // --- helpers ---------------------------------------------------------------
 
@@ -243,6 +244,29 @@ describe("Landing", () => {
     expect(args.gameType).toBe("tic_tac_toe");
     expect(typeof args.deviceToken).toBe("string");
     expect(args.deviceToken.length).toBeGreaterThanOrEqual(8);
+
+    act(() => root.unmount());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NotFound
+// ---------------------------------------------------------------------------
+
+describe("NotFound", () => {
+  test("renders the branded 404 with a link back home", async () => {
+    const { container, root } = await renderPage(<NotFound />);
+    const out = html(root, container);
+
+    expect(out).toContain("404");
+    expect(out).toContain("That page wandered off.");
+    expect(out).toContain("Silence is safe here");
+    expect(out).toContain("Back to Recess");
+
+    // Both the header wordmark and the CTA link home; the CTA carries the copy.
+    const homeLinks = [...container.querySelectorAll('a[href="/"]')];
+    expect(homeLinks.length).toBeGreaterThanOrEqual(2);
+    expect(homeLinks.some((l) => l.textContent?.includes("Back to Recess"))).toBe(true);
 
     act(() => root.unmount());
   });
