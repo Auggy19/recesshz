@@ -446,3 +446,117 @@ export function applyPongReturn(
     over: matchWinner !== null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Twenty Questions rules — one answerer, one asker, up to 20 questions.
+//
+// The initiator (X) secretly picks a word or phrase. The responder (O) asks
+// up to 20 yes/no questions, one at a time; X answers each before the next is
+// asked. O may guess at any point — a correct guess wins, a wrong final guess
+// loses (the classic rule). Once the 20th question is answered the asker gets
+// exactly one final guess. Single-round, like Tic Tac Toe: one match, one
+// winner. The secret stays hidden from O (server-masked on reads) until the
+// match ends and it's revealed.
+// ---------------------------------------------------------------------------
+
+export const TWENTY_QUESTIONS_GAME_TYPE = "twenty_questions" as const;
+
+/** How many yes/no questions the asker gets. */
+export const MAX_QUESTIONS = 20;
+
+export type YesNo = "yes" | "no";
+export type TwentyQuestionsPhase =
+  | "setup" // X is picking the secret
+  | "asking" // a question is being asked or answered
+  | "final" // all 20 questions used — the asker must guess now
+  | "match_over";
+
+export interface TwentyQuestionsEntry {
+  text: string;
+  answer: YesNo;
+}
+
+export interface TwentyQuestionsState {
+  phase: TwentyQuestionsPhase;
+  /** The answerer's secret — masked from the asker until the match ends. */
+  secret: string | null;
+  /** The asker's question awaiting an answer (null while the asker acts). */
+  pendingQuestion: string | null;
+  /** Answered questions, in order. */
+  questions: TwentyQuestionsEntry[];
+  /** Match winner — O (guessed right) or X (wrong guess / 20 questions up). */
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+export function freshTwentyQuestionsState(): TwentyQuestionsState {
+  return {
+    phase: "setup",
+    secret: null,
+    pendingQuestion: null,
+    questions: [],
+    winner: null,
+  };
+}
+
+/** Lock in the answerer's secret and open the floor to questions. */
+export function applyTwentyQuestionsSecret(
+  current: TwentyQuestionsState,
+  secret: string,
+): TwentyQuestionsState {
+  return { ...current, secret, phase: "asking" };
+}
+
+/** Record the asker's question — it's now the answerer's turn. */
+export function applyTwentyQuestionsQuestion(
+  current: TwentyQuestionsState,
+  question: string,
+): TwentyQuestionsState {
+  return { ...current, pendingQuestion: question };
+}
+
+/**
+ * Answer the pending question. The 20th answer moves the game to the final
+ * guess — the asker gets one last chance before losing.
+ */
+export function applyTwentyQuestionsAnswer(
+  current: TwentyQuestionsState,
+  answer: YesNo,
+): TwentyQuestionsState {
+  const questions = [
+    ...current.questions,
+    { text: current.pendingQuestion ?? "", answer },
+  ];
+  const phase: TwentyQuestionsPhase =
+    questions.length >= MAX_QUESTIONS ? "final" : "asking";
+  return { ...current, questions, pendingQuestion: null, phase };
+}
+
+/** Case- and whitespace-insensitive comparison. */
+function normalizeSecret(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+export interface TwentyQuestionsOutcome {
+  state: TwentyQuestionsState;
+  over: boolean;
+}
+
+/**
+ * Resolve the asker's guess. A correct guess wins O the match; a wrong one
+ * loses it (the classic rule — you only guess when you're sure). The secret
+ * is revealed to both players now that the match is over.
+ */
+export function applyTwentyQuestionsGuess(
+  current: TwentyQuestionsState,
+  guess: string,
+): TwentyQuestionsOutcome {
+  const winner: Marker =
+    normalizeSecret(guess) === normalizeSecret(current.secret ?? "")
+      ? "O"
+      : "X";
+  return {
+    state: { ...current, phase: "match_over", winner },
+    over: true,
+  };
+}

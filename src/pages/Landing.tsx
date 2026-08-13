@@ -65,6 +65,11 @@ function urlGameToType(raw: string | null): string | null {
     case "ping-pong":
     case "ping_pong":
       return "pong";
+    case "twenty-questions":
+    case "twenty_questions":
+    case "20-questions":
+    case "tq":
+      return "twenty_questions";
     default:
       return null;
   }
@@ -80,11 +85,6 @@ function apiErrorMessage(err: unknown): string | null {
 }
 
 const upcomingGames: GameCard[] = [
-  {
-    name: "Twenty Questions",
-    blurb: "Yes. No. Yes again. Got it!",
-    art: <TwentyQuestionsArt className="w-full max-w-[92px]" />,
-  },
   {
     name: "Truth or Dare",
     blurb: "Choose carefully.",
@@ -416,11 +416,43 @@ export default function Landing() {
             </span>
           </button>
 
+          {/* Twenty Questions — the fifth live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("twenty_questions")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-3xl border-2 border-primary bg-card p-6 text-left shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/20 lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+              Ready to play
+            </div>
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
+              <TwentyQuestionsArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">
+                Twenty Questions
+              </h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                One of you thinks of something, the other asks yes/no questions
+                until the guess lands — or the 20 questions run out.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-transform group-hover:translate-x-0.5">
+              {creating === "twenty_questions" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
           {/* Coming soon — each game gets its illustration */}
           {upcomingGames.map((game) => (
             <div
               key={game.name}
-              className="flex flex-col gap-4 rounded-3xl border border-border bg-card/60 p-6 opacity-80 transition-opacity hover:opacity-100"
+              className="col-span-2 flex flex-col gap-4 rounded-3xl border border-border bg-card/60 p-6 opacity-80 transition-opacity hover:opacity-100"
             >
               <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4">
                 {game.art}
@@ -476,6 +508,7 @@ export default function Landing() {
                   ["rock_paper_scissors", "RPS"],
                   ["red_or_black", "Red/Black"],
                   ["pong", "Pong"],
+                  ["twenty_questions", "20 Qs"],
                 ] as const
               ).map(([value, label]) => (
                 <button

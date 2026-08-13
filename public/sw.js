@@ -17,6 +17,7 @@ const SHELL = [
   "/og-rock-paper-scissors.png",
   "/og-red-or-black.png",
   "/og-pong.png",
+  "/og-twenty-questions.png",
   "/apple-touch-icon.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

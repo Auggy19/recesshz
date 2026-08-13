@@ -9,6 +9,7 @@
 //     public/og-rock-paper-scissors.png
 //     public/og-red-or-black.png
 //     public/og-pong.png
+//     public/og-twenty-questions.png
 //
 //   Template 2 — the bare app link. The logo mark + wordmark centered on the
 //   amber background, tagline below — no game board:
@@ -112,6 +113,26 @@ const strokeCircle = (set, cx, cy, r, th, c) => {
   }
 };
 
+/** Fill an arbitrary triangle (used for the speech-bubble tail). */
+function fillTriangle(set, ax, ay, bx, by, cx, cy, c) {
+  const sign = (p1x, p1y, p2x, p2y, p3x, p3y) =>
+    (p1x - p3x) * (p2y - p3y) - (p2x - p3x) * (p1y - p3y);
+  const minX = Math.floor(Math.min(ax, bx, cx));
+  const maxX = Math.ceil(Math.max(ax, bx, cx));
+  const minY = Math.floor(Math.min(ay, by, cy));
+  const maxY = Math.ceil(Math.max(ay, by, cy));
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const d1 = sign(x, y, ax, ay, bx, by);
+      const d2 = sign(x, y, bx, by, cx, cy);
+      const d3 = sign(x, y, cx, cy, ax, ay);
+      const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+      const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+      if (!(hasNeg && hasPos)) set(x, y, c);
+    }
+  }
+}
+
 const line = (set, ax, ay, bx, by, th, c) => {
   const r = th / 2;
   const x0 = Math.floor(Math.min(ax, bx) - r);
@@ -152,7 +173,7 @@ function drawR(set, x0, y0, scale, c) {
 }
 
 // ---- 5x7 pixel type ------------------------------------------------------
-// Only the glyphs we need (all lowercase + a period).
+// Only the glyphs we need (all lowercase + a period + a question mark).
 const FONT = {
   a: ["01110", "00001", "01111", "10001", "10001", "10001", "01111"],
   c: ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
@@ -165,6 +186,7 @@ const FONT = {
   r: ["00000", "00000", "10110", "11000", "10000", "10000", "10000"],
   s: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
   ".": ["00000", "00000", "00000", "00000", "00000", "00110", "00110"],
+  "?": ["00111", "01001", "00010", "00100", "00100", "00000", "00100"],
 };
 
 /** Width of a string in the 5x7 font at the given scale/gap. */
@@ -297,6 +319,26 @@ function drawRedBlack(set) {
   pip(730, 385);
 }
 
+/** The Twenty Questions speech bubble: amber bubble with an ink outline, a
+ *  tail poking down-left, and a big engraved question mark — mirroring the
+ *  TwentyQuestionsArt icon. */
+function drawTwentyQuestions(set) {
+  // tail — drawn first so the bubble's stroke crosses it cleanly
+  fillTriangle(set, 480, 415, 370, 515, 540, 470, AMBER);
+  line(set, 480, 415, 370, 515, 10, INK);
+  line(set, 370, 515, 540, 470, 10, INK);
+  line(set, 540, 470, 480, 415, 10, INK);
+
+  // the bubble
+  fillRoundedRect(set, 390, 160, 810, 420, 48, AMBER);
+  strokeRoundedRect(set, 390, 160, 810, 420, 48, 10, INK);
+
+  // the engraved question mark, centered in the bubble
+  const scale = 18;
+  const qW = 5 * scale;
+  drawText(set, "?", 600 - qW / 2, 353, scale, 0, INK);
+}
+
 /** The Pong court: two amber paddles with ink outlines, a dashed center
  *  line, and an amber ball — the top-down view from the PongArt icon. */
 function drawPong(set) {
@@ -333,6 +375,7 @@ function renderGameCard(board, outFile) {
   if (board === "ttt") drawTtt(set);
   else if (board === "rps") drawRps(set);
   else if (board === "redblack") drawRedBlack(set);
+  else if (board === "tq") drawTwentyQuestions(set);
   else drawPong(set);
 
   // Tagline below the card.
@@ -434,6 +477,7 @@ renderGameCard("ttt", "public/og-tic-tac-toe.png");
 renderGameCard("rps", "public/og-rock-paper-scissors.png");
 renderGameCard("redblack", "public/og-red-or-black.png");
 renderGameCard("pong", "public/og-pong.png");
+renderGameCard("tq", "public/og-twenty-questions.png");
 renderBrandCard("public/og-app.png");
 
 // Alias kept for stale references — identical composition to the TTT card.
@@ -447,6 +491,7 @@ if (process.argv.includes("--ascii")) {
     "public/og-rock-paper-scissors.png",
     "public/og-red-or-black.png",
     "public/og-pong.png",
+    "public/og-twenty-questions.png",
   ];
   for (const f of files) {
     const b = readFileSync(f);

@@ -33,6 +33,7 @@ import type {
 } from "./schema";
 import {
   GAME_TYPE,
+  MAX_QUESTIONS,
   PONG_GAME_TYPE,
   PONG_POWERS,
   PONG_RETURN_ANGLE,
@@ -41,16 +42,22 @@ import {
   RED_BLACK_GAME_TYPE,
   RPS_CHOICES,
   RED_BLACK_CHOICES,
+  TWENTY_QUESTIONS_GAME_TYPE,
   applyPongReturn,
   applyPongServe,
   applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
+  applyTwentyQuestionsAnswer,
+  applyTwentyQuestionsGuess,
+  applyTwentyQuestionsQuestion,
+  applyTwentyQuestionsSecret,
   coinFlip,
   freshPongState,
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
+  freshTwentyQuestionsState,
   type Marker,
   type PongPower,
   type PongState,
@@ -58,6 +65,8 @@ import {
   type RedBlackState,
   type RpsChoice,
   type RpsState,
+  type TwentyQuestionsState,
+  type YesNo,
 } from "./gameLogic";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -87,6 +96,7 @@ const SUPPORTED_GAME_TYPES = new Set<string>([
   RPS_GAME_TYPE,
   RED_BLACK_GAME_TYPE,
   PONG_GAME_TYPE,
+  TWENTY_QUESTIONS_GAME_TYPE,
 ]);
 
 function freshStateFor(gameType: string): unknown {
@@ -99,6 +109,8 @@ function freshStateFor(gameType: string): unknown {
       return freshRedBlackState();
     case PONG_GAME_TYPE:
       return freshPongState();
+    case TWENTY_QUESTIONS_GAME_TYPE:
+      return freshTwentyQuestionsState();
     default:
       return fail(
         "unsupported_game",
@@ -112,6 +124,20 @@ function maskRpsState(state: RpsState): RpsState {
   return state.phase === "picking"
     ? { ...state, picks: { X: null, O: null } }
     : state;
+}
+
+/**
+ * Twenty Questions masking: the secret stays hidden from everyone but the
+ * answerer (X) until the match ends and it's revealed to both players.
+ */
+function maskTwentyQuestionsState(
+  state: TwentyQuestionsState,
+  marker: Marker | null,
+): TwentyQuestionsState {
+  if (marker !== "X" && state.phase !== "match_over") {
+    return { ...state, secret: null };
+  }
+  return state;
 }
 
 function isStale(updatedAt: number): boolean {
@@ -179,7 +205,7 @@ export const createGame = mutation({
     if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
-        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, Red or Black, and Pong are supported in this build.`,
+        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, Red or Black, Pong, and Twenty Questions are supported in this build.`,
       );
     }
     if (!deviceToken || deviceToken.length < 8) {
@@ -327,12 +353,21 @@ export const getGameState = query({
 
     const rpsState =
       game.gameType === RPS_GAME_TYPE ? (game.state as RpsState) : null;
+    const tqState =
+      game.gameType === TWENTY_QUESTIONS_GAME_TYPE
+        ? (game.state as TwentyQuestionsState)
+        : null;
 
     return {
       status: game.status,
       gameType: game.gameType,
-      // RPS picks are masked until both players have submitted this round.
-      state: rpsState ? maskRpsState(rpsState) : game.state,
+      // RPS picks are masked until both players have submitted this round;
+      // the Twenty Questions secret is masked from the asker until the end.
+      state: rpsState
+        ? maskRpsState(rpsState)
+        : tqState
+          ? maskTwentyQuestionsState(tqState, me?.marker ?? null)
+          : game.state,
       me: me
         ? {
             role: me.role,
@@ -367,8 +402,16 @@ export const submitMove = mutation({
     // depends on the game type (validated in the per-game handlers).
     angle: v.optional(v.number()),
     power: v.optional(v.number()),
+    // Twenty Questions: exactly one of these per move (validated per-phase).
+    secret: v.optional(v.string()),
+    question: v.optional(v.string()),
+    answer: v.optional(v.union(v.literal("yes"), v.literal("no"))),
+    guess: v.optional(v.string()),
   },
-  handler: async (ctx, { slug, deviceToken, cell, pick, angle, power }) => {
+  handler: async (
+    ctx,
+    { slug, deviceToken, cell, pick, angle, power, secret, question, answer, guess },
+  ) => {
     const game = await getGameBySlug(ctx, slug);
     if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
 
@@ -406,6 +449,14 @@ export const submitMove = mutation({
     }
     if (game.gameType === PONG_GAME_TYPE) {
       return await submitPongShot(ctx, game, player, angle, power);
+    }
+    if (game.gameType === TWENTY_QUESTIONS_GAME_TYPE) {
+      return await submitTwentyQuestions(ctx, game, player, {
+        secret,
+        question,
+        answer,
+        guess,
+      });
     }
 
     // Tic Tac Toe — cell-based move.
@@ -620,6 +671,170 @@ async function submitPongShot(
   });
 
   return { ok: true, state: outcome.state };
+}
+
+/**
+ * Twenty Questions move. The server resolves the player from the device
+ * token and enforces every phase rule — never trusts the client:
+ *   - setup: only X submits a secret (1-80 chars) and the game opens
+ *   - asking: O asks a question (1-200 chars, max 20, one at a time) or
+ *     guesses; X answers the pending question with yes/no
+ *   - final: after the 20th answer only O's guess is accepted
+ *   - a wrong final guess loses; a correct one wins
+ * The secret stays masked on reads until the match ends.
+ */
+async function submitTwentyQuestions(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  move: {
+    secret?: string;
+    question?: string;
+    answer?: string;
+    guess?: string;
+  },
+) {
+  const state = game.state as TwentyQuestionsState;
+  if (state.winner) {
+    fail("invalid_move", "This match is already over.");
+  }
+
+  const fields = [move.secret, move.question, move.answer, move.guess].filter(
+    (f) => f !== undefined,
+  );
+  if (fields.length !== 1) {
+    fail(
+      "invalid_move",
+      "Send exactly one action — a secret, a question, an answer, or a guess.",
+    );
+  }
+
+  const now = Date.now();
+  const audit = (type: string, extra: Record<string, unknown> = {}) =>
+    ctx.db.insert("moves", {
+      gameId: game._id,
+      playerId: player._id,
+      payload: { type, marker: player.marker, ...extra },
+      createdAt: now,
+    });
+  const commit = (outcome: { state: TwentyQuestionsState; over: boolean }) =>
+    ctx.db.patch(game._id, {
+      state: outcome.state,
+      status: outcome.over
+        ? ("completed" as GameStatus)
+        : ("in_progress" as GameStatus),
+      updatedAt: now,
+    });
+
+  // The answerer (X) picks the secret during setup.
+  if (move.secret !== undefined) {
+    if (state.phase !== "setup") {
+      fail("invalid_move", "The secret is already locked in.");
+    }
+    if (player.marker !== "X") {
+      fail("invalid_move", "Only the answerer picks the secret.");
+    }
+    const secret = move.secret.trim();
+    if (!secret || secret.length > 80) {
+      fail("invalid_move", "Pick a short secret — 1 to 80 characters.");
+    }
+    const outcome = {
+      state: applyTwentyQuestionsSecret(state, secret),
+      over: false,
+    };
+    await audit("secret");
+    await commit(outcome);
+    return { ok: true, state: outcome.state };
+  }
+
+  // The asker (O) asks a yes/no question.
+  if (move.question !== undefined) {
+    if (player.marker !== "O") {
+      fail("invalid_move", "Only the asker asks questions.");
+    }
+    if (state.phase === "setup") {
+      fail("invalid_move", "Wait for the secret first.");
+    }
+    if (state.phase === "final") {
+      fail(
+        "invalid_move",
+        "That's all your questions — make your final guess.",
+      );
+    }
+    if (state.pendingQuestion !== null) {
+      fail(
+        "invalid_move",
+        "Answer the question on the table first.",
+      );
+    }
+    if (state.questions.length >= MAX_QUESTIONS) {
+      fail("invalid_move", "That's all 20 questions — make your guess.");
+    }
+    const question = move.question.trim();
+    if (!question || question.length > 200) {
+      fail("invalid_move", "Questions run 1 to 200 characters.");
+    }
+    const outcome = {
+      state: applyTwentyQuestionsQuestion(state, question),
+      over: false,
+    };
+    await audit("question", { question, number: state.questions.length + 1 });
+    await commit(outcome);
+    return {
+      ok: true,
+      state: maskTwentyQuestionsState(outcome.state, player.marker),
+    };
+  }
+
+  // The answerer (X) answers the pending question.
+  if (move.answer !== undefined) {
+    if (player.marker !== "X") {
+      fail("invalid_move", "Only the answerer answers questions.");
+    }
+    if (state.phase !== "asking" || state.pendingQuestion === null) {
+      fail("invalid_move", "There's no question to answer right now.");
+    }
+    const answer = move.answer as YesNo;
+    const outcome = {
+      state: applyTwentyQuestionsAnswer(state, answer),
+      over: false,
+    };
+    await audit("answer", { answer, number: state.questions.length + 1 });
+    await commit(outcome);
+    return { ok: true, state: outcome.state };
+  }
+
+  // The asker (O) makes a guess.
+  const guess = move.guess;
+  if (guess !== undefined) {
+    if (player.marker !== "O") {
+      fail("invalid_move", "Only the asker guesses.");
+    }
+    if (state.phase === "setup") {
+      fail("invalid_move", "Wait for the secret first.");
+    }
+    if (state.pendingQuestion !== null) {
+      fail(
+        "invalid_move",
+        "Answer the question on the table first.",
+      );
+    }
+    const trimmed = guess.trim();
+    if (!trimmed || trimmed.length > 200) {
+      fail("invalid_move", "Guesses run 1 to 200 characters.");
+    }
+    const outcome = applyTwentyQuestionsGuess(state, trimmed);
+    await audit("guess", {
+      guess: trimmed,
+      questionsUsed: state.questions.length,
+    });
+    await commit(outcome);
+    // Revealed to the asker now that the match is over.
+    return { ok: true, state: outcome.state };
+  }
+
+  // Unreachable — the exactly-one-field check above covers every path.
+  fail("invalid_move", "Nothing to submit.");
 }
 
 // ---------------------------------------------------------------------------

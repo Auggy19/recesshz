@@ -6,6 +6,7 @@ import {
   RedOrBlackArt,
   RockPaperScissorsArt,
   TicTacToeArt,
+  TwentyQuestionsArt,
 } from "@/components/GameArt";
 import TicTacToePlay, {
   type Marker,
@@ -20,6 +21,9 @@ import RedBlackPlay, {
 import PongPlay, {
   type PongPower,
 } from "@/components/games/PongPlay";
+import TwentyQuestionsPlay, {
+  type TwentyQuestionsMove,
+} from "@/components/games/TwentyQuestionsPlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
@@ -93,6 +97,15 @@ interface PongState {
   rematch?: { slug: string; by: string };
 }
 
+interface TwentyQuestionsState {
+  phase: "setup" | "asking" | "final" | "match_over";
+  secret: string | null;
+  pendingQuestion: string | null;
+  questions: { text: string; answer: "yes" | "no" }[];
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
 interface ApiError {
   code?: string;
   message?: string;
@@ -117,10 +130,12 @@ function gameOgTitle(
   isRps: boolean,
   isRedBlack: boolean,
   isPong: boolean,
+  isTwentyQuestions: boolean,
   state: TicTacToeState | null,
   rpsState: RpsState | null,
   rbState: RedBlackState | null,
   pongState: PongState | null,
+  tqState: TwentyQuestionsState | null,
   myMarker: Marker | null,
 ): string {
   if (status === "waiting") return `${gameLabel} — Your Turn`;
@@ -132,7 +147,9 @@ function gameOgTitle(
         ? (rbState?.matchWinner ?? null)
         : isPong
           ? (pongState?.matchWinner ?? null)
-          : (state?.winner ?? null);
+          : isTwentyQuestions
+            ? (tqState?.winner ?? null)
+            : (state?.winner ?? null);
     if (winner === myMarker) return `${gameLabel} — You Win!`;
     if (winner === null) return `${gameLabel} — It's a Draw`;
     return `${gameLabel} — Your Friend Wins`;
@@ -147,6 +164,18 @@ function gameOgTitle(
   if (isRedBlack) {
     // Only the guesser (O) ever has a turn in Red or Black.
     return rbState?.phase === "picking" && myMarker === "O"
+      ? `${gameLabel} — Your Turn`
+      : `${gameLabel} — Waiting on Your Friend`;
+  }
+  if (isTwentyQuestions) {
+    // Setup: X picks the secret. Asking/final: whoever has the floor.
+    const tqTurn =
+      tqState?.phase === "setup"
+        ? myMarker === "X"
+        : tqState?.pendingQuestion !== null
+          ? myMarker === "X"
+          : myMarker === "O";
+    return tqTurn
       ? `${gameLabel} — Your Turn`
       : `${gameLabel} — Waiting on Your Friend`;
   }
@@ -273,6 +302,7 @@ export default function GamePage() {
   const isRps = gameType === "rock_paper_scissors";
   const isRedBlack = gameType === "red_or_black";
   const isPong = gameType === "pong";
+  const isTwentyQuestions = gameType === "twenty_questions";
   // RPS, Red or Black, and Pong share the same match shape (rounds + scores).
   const matchGame = isRps || isRedBlack || isPong;
   const status: GameStatus | null = game?.status ?? null;
@@ -280,6 +310,7 @@ export default function GamePage() {
   const rpsState = (game?.state as RpsState) ?? null;
   const rbState = (game?.state as RedBlackState) ?? null;
   const pongState = (game?.state as PongState) ?? null;
+  const tqState = (game?.state as TwentyQuestionsState) ?? null;
   const myMarker: Marker | null = game?.me?.marker ?? me?.marker ?? null;
   const matchWinner: Marker | null = matchGame
     ? isRps
@@ -291,7 +322,9 @@ export default function GamePage() {
 
   const isOver = matchGame
     ? matchWinner !== null
-    : state !== null && (state.winner !== null || state.draw);
+    : isTwentyQuestions
+      ? tqState !== null && tqState.winner !== null
+      : state !== null && (state.winner !== null || state.draw);
 
   const gameLabel = isRps
     ? "Rock Paper Scissors"
@@ -299,7 +332,9 @@ export default function GamePage() {
       ? "Red or Black"
       : isPong
         ? "Pong"
-        : "Tic Tac Toe";
+        : isTwentyQuestions
+          ? "Twenty Questions"
+          : "Tic Tac Toe";
 
   // Record the streak exactly once when a game completes — the ref guards
   // against the reactive query re-delivering the same terminal state, while
@@ -326,10 +361,12 @@ export default function GamePage() {
       isRps,
       isRedBlack,
       isPong,
+      isTwentyQuestions,
       state,
       rpsState,
       rbState,
       pongState,
+      tqState,
       myMarker,
     );
     applyOgMeta(
@@ -341,7 +378,7 @@ export default function GamePage() {
       },
       shareUrl,
     );
-  }, [status, isRps, isRedBlack, isPong, state, rpsState, rbState, pongState, myMarker, gameLabel, gameType, shareUrl]);
+  }, [status, isRps, isRedBlack, isPong, isTwentyQuestions, state, rpsState, rbState, pongState, tqState, myMarker, gameLabel, gameType, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
@@ -389,6 +426,16 @@ export default function GamePage() {
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That shot didn't go through.");
+      return false;
+    }
+  };
+
+  const handleTqMove = async (move: TwentyQuestionsMove): Promise<boolean> => {
+    try {
+      await submitMove({ slug, deviceToken, ...move });
+      return true;
+    } catch (err) {
+      setMoveError(getApiError(err).message ?? "That move didn't go through.");
       return false;
     }
   };
@@ -518,12 +565,19 @@ export default function GamePage() {
         : pongState!.scores[myMarker === "X" ? "O" : "X"]
     : 0;
 
+  const winner: Marker | null = matchGame
+    ? matchWinner
+    : isTwentyQuestions
+      ? (tqState?.winner ?? null)
+      : (state?.winner ?? null);
+  const draw = !matchGame && !isTwentyQuestions && state !== null && state.draw;
+
   const resultTitle = matchGame
     ? matchWinner === myMarker
       ? "You win the match!"
       : "Your friend wins the match"
-    : state.winner
-      ? state.winner === myMarker
+    : winner
+      ? winner === myMarker
         ? "You win!"
         : "Your friend wins"
       : "It's a draw";
@@ -534,11 +588,15 @@ export default function GamePage() {
           ? "Silence never felt so good."
           : "Rematch? The score is right there."
       }`
-    : state.draw
-      ? "A perfect standoff."
-      : state.winner === myMarker
+    : isTwentyQuestions
+      ? winner === myMarker
         ? "Silence never felt so good."
-        : "Rematch? The board is waiting.";
+        : "The secret is out — rematch?"
+      : draw
+        ? "A perfect standoff."
+        : state.winner === myMarker
+          ? "Silence never felt so good."
+          : "Rematch? The board is waiting.";
 
   // If the opponent started a rematch, offer to follow them; otherwise the
   // usual Play Again button (which also covers rematches I started myself).
@@ -548,7 +606,9 @@ export default function GamePage() {
       : isRedBlack
         ? rbState?.rematch
         : pongState?.rematch
-    : (state.rematch ?? null);
+    : isTwentyQuestions
+      ? (tqState?.rematch ?? null)
+      : (state.rematch ?? null);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -577,6 +637,8 @@ export default function GamePage() {
                   <RedOrBlackArt className="w-16" />
                 ) : isPong ? (
                   <PongArt className="w-16" />
+                ) : isTwentyQuestions ? (
+                  <TwentyQuestionsArt className="w-16" />
                 ) : (
                   <TicTacToeArt className="w-16" />
                 )}
@@ -592,7 +654,9 @@ export default function GamePage() {
                       ? "You're the host. Your friend picks red or black — you watch the reveal."
                       : isPong
                         ? "You're X and serve first — first to 7 points wins."
-                        : "You're X and play first. Your board waits."}
+                        : isTwentyQuestions
+                          ? "You're the answerer. Pick a secret when they join — they get 20 questions to guess it."
+                          : "You're X and play first. Your board waits."}
                 </p>
               </div>
             </div>
@@ -656,6 +720,13 @@ export default function GamePage() {
               status={status}
               myMarker={myMarker!}
               onShot={handleShot}
+            />
+          ) : isTwentyQuestions ? (
+            <TwentyQuestionsPlay
+              state={tqState!}
+              status={status}
+              myMarker={myMarker!}
+              onSubmit={handleTqMove}
             />
           ) : (
             <TicTacToePlay

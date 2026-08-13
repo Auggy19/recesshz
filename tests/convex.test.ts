@@ -105,7 +105,7 @@ describe("createGame", () => {
     const db = new FakeDb();
     await expectCode(
       run(createGame, db, {
-        gameType: "twenty_questions",
+        gameType: "truth_or_dare",
         deviceToken: "device-A",
       }),
       "unsupported_game",
@@ -662,6 +662,237 @@ describe("submitMove — Pong", () => {
     expect((state as { phase: string }).phase).toBe("match_over");
     expect((state as { scores: object }).scores).toEqual({ X: 7, O: 0 });
     expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/games/:id/moves — Twenty Questions
+// ---------------------------------------------------------------------------
+
+describe("submitMove — Twenty Questions", () => {
+  test("createGame starts a fresh Twenty Questions game in setup", async () => {
+    const db = new FakeDb();
+    const { slug, game } = await newGame(db, "twenty_questions");
+    expect(game.status).toBe("waiting");
+    expect((game.state as { phase: string }).phase).toBe("setup");
+    expect((game.state as { secret: unknown }).secret).toBeNull();
+    expect(slug).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test("only the answerer (X) sets the secret during setup", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    // O tries to set the secret — rejected.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", secret: "sneaky" }),
+      "invalid_move",
+    );
+    // X sets it and the game opens.
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-A",
+      secret: "  a giraffe  ",
+    })) as { state: { phase: string; secret: string } };
+    expect(res.state.phase).toBe("asking");
+    expect(res.state.secret).toBe("a giraffe"); // trimmed server-side
+    expect(db.all("moves")).toHaveLength(1);
+    expect((db.all("moves")[0].payload as { type: string }).type).toBe("secret");
+  });
+
+  test("empty or over-long secrets are rejected", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "   " }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, {
+        slug,
+        deviceToken: "device-A",
+        secret: "x".repeat(81),
+      }),
+      "invalid_move",
+    );
+  });
+
+  test("asking a question is O's move and opens the answerer's turn", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+
+    // X can't ask — only the asker does.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", question: "Am I tall?" }),
+      "invalid_move",
+    );
+    // O asks.
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      question: "Is it an animal?",
+    })) as { state: { pendingQuestion: string; secret: unknown } };
+    expect(res.state.pendingQuestion).toBe("Is it an animal?");
+    // The response to O masks the secret.
+    expect(res.state.secret).toBeNull();
+  });
+
+  test("only X answers, and the pair is recorded", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+    await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      question: "Is it an animal?",
+    });
+
+    // O tries to answer their own question — rejected.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", answer: "yes" }),
+      "invalid_move",
+    );
+    // X answers.
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-A",
+      answer: "yes",
+    })) as { state: { questions: { text: string; answer: string }[] } };
+    expect(res.state.questions).toEqual([
+      { text: "Is it an animal?", answer: "yes" },
+    ]);
+    expect(res.state.pendingQuestion).toBeNull();
+  });
+
+  test("exactly one action per move is enforced", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await expectCode(
+      run(submitMove, db, {
+        slug,
+        deviceToken: "device-A",
+        question: "X?",
+        secret: "giraffe",
+      }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe", guess: "giraffe" }),
+      "invalid_move",
+    );
+  });
+
+  test("a correct guess completes the game with O the winner, secret revealed", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "Giraffe" });
+    await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      question: "Is it an animal?",
+    });
+    await run(submitMove, db, { slug, deviceToken: "device-A", answer: "yes" });
+
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: " a giraffe ",
+    })) as { state: { phase: string; winner: string; secret: string } };
+    expect(res.state.phase).toBe("match_over");
+    expect(res.state.winner).toBe("O");
+    expect(res.state.secret).toBe("Giraffe");
+    expect(gameBySlug(db, slug).status).toBe("completed");
+
+    // Both players now see the revealed secret.
+    const forB = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-B",
+    })) as { state: { secret: string } };
+    expect(forB.state.secret).toBe("Giraffe");
+  });
+
+  test("a wrong final guess loses — X wins", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "zebra",
+    })) as { state: { winner: string } };
+    expect(res.state.winner).toBe("X");
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("the secret is masked from the asker on reads until the match ends", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+
+    // O reads — the secret is hidden.
+    const forB = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-B",
+    })) as { state: { secret: unknown; phase: string } };
+    expect(forB.state.secret).toBeNull();
+    expect(forB.state.phase).toBe("asking");
+
+    // X reads — their own secret is visible.
+    const forA = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-A",
+    })) as { state: { secret: unknown } };
+    expect(forA.state.secret).toBe("giraffe");
+  });
+
+  test("after 20 questions the asker gets one final guess, no more questions", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+    for (let i = 0; i < 20; i++) {
+      await run(submitMove, db, {
+        slug,
+        deviceToken: "device-B",
+        question: `Question ${i + 1}?`,
+      });
+      await run(submitMove, db, {
+        slug,
+        deviceToken: "device-A",
+        answer: i % 2 === 0 ? "yes" : "no",
+      });
+    }
+    const state = gameBySlug(db, slug).state as {
+      phase: string;
+      questions: unknown[];
+    };
+    expect(state.phase).toBe("final");
+    expect(state.questions).toHaveLength(20);
+
+    // Asking more is rejected; only the final guess is accepted.
+    await expectCode(
+      run(submitMove, db, {
+        slug,
+        deviceToken: "device-B",
+        question: "One more?",
+      }),
+      "invalid_move",
+    );
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "giraffe",
+    })) as { state: { winner: string } };
+    expect(res.state.winner).toBe("O");
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("a non-player's move is rejected", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "twenty_questions");
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "intruder", secret: "giraffe" }),
+      "not_a_player",
+    );
   });
 });
 

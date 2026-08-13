@@ -8,11 +8,16 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  MAX_QUESTIONS,
   applyPongReturn,
   applyPongServe,
   applyRedBlackGuess,
   applyRpsPick,
   applyTicTacToeMove,
+  applyTwentyQuestionsAnswer,
+  applyTwentyQuestionsGuess,
+  applyTwentyQuestionsQuestion,
+  applyTwentyQuestionsSecret,
   beats,
   coinFlip,
   findWinningLine,
@@ -20,6 +25,7 @@ import {
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
+  freshTwentyQuestionsState,
   isBoardFull,
   isGoodPongReturn,
   otherMarker,
@@ -409,5 +415,93 @@ describe("pong", () => {
     expect(state.matchWinner).toBe("X");
     expect(state.phase).toBe("match_over");
     expect(state.scores).toEqual({ X: 7, O: 0 });
+  });
+});
+
+// --- Twenty Questions ------------------------------------------------------
+
+describe("twenty questions", () => {
+  test("fresh state: setup phase, no secret, no questions", () => {
+    const s = freshTwentyQuestionsState();
+    expect(s.phase).toBe("setup");
+    expect(s.secret).toBeNull();
+    expect(s.pendingQuestion).toBeNull();
+    expect(s.questions).toEqual([]);
+    expect(s.winner).toBeNull();
+  });
+
+  test("setting the secret opens the floor to questions", () => {
+    const s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "a giraffe");
+    expect(s.secret).toBe("a giraffe");
+    expect(s.phase).toBe("asking");
+    expect(s.pendingQuestion).toBeNull();
+  });
+
+  test("a question becomes pending — the answerer's turn", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    s = applyTwentyQuestionsQuestion(s, "Is it an animal?");
+    expect(s.pendingQuestion).toBe("Is it an animal?");
+  });
+
+  test("an answer records the pair and clears the pending question", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    s = applyTwentyQuestionsQuestion(s, "Is it an animal?");
+    s = applyTwentyQuestionsAnswer(s, "yes");
+    expect(s.pendingQuestion).toBeNull();
+    expect(s.questions).toEqual([
+      { text: "Is it an animal?", answer: "yes" },
+    ]);
+    expect(s.phase).toBe("asking");
+  });
+
+  test("a correct guess wins O and reveals the secret", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "Giraffe");
+    s = applyTwentyQuestionsQuestion(s, "Is it an animal?");
+    s = applyTwentyQuestionsAnswer(s, "yes");
+    const { state, over } = applyTwentyQuestionsGuess(s, " a giraffe ");
+    expect(over).toBe(true);
+    expect(state.phase).toBe("match_over");
+    expect(state.winner).toBe("O");
+    expect(state.secret).toBe("Giraffe"); // revealed on reveal screen
+  });
+
+  test("a wrong guess loses O — the classic rule", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    const { state, over } = applyTwentyQuestionsGuess(s, "a zebra");
+    expect(over).toBe(true);
+    expect(state.winner).toBe("X");
+  });
+
+  test("the 20th answer moves to the final guess", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    for (let i = 0; i < MAX_QUESTIONS; i++) {
+      s = applyTwentyQuestionsQuestion(s, `Question ${i + 1}?`);
+      s = applyTwentyQuestionsAnswer(s, i % 2 === 0 ? "yes" : "no");
+    }
+    expect(s.questions).toHaveLength(MAX_QUESTIONS);
+    expect(s.phase).toBe("final");
+    expect(s.pendingQuestion).toBeNull();
+    // The final guess still decides it.
+    const { state } = applyTwentyQuestionsGuess(s, "giraffe");
+    expect(state.winner).toBe("O");
+  });
+
+  test("the answerer wins if the final guess misses", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    for (let i = 0; i < MAX_QUESTIONS; i++) {
+      s = applyTwentyQuestionsQuestion(s, `Q${i + 1}?`);
+      s = applyTwentyQuestionsAnswer(s, "yes");
+    }
+    const { state } = applyTwentyQuestionsGuess(s, "elephant");
+    expect(state.winner).toBe("X");
+  });
+
+  test("the match is single-round: one winner, then over", () => {
+    let s = applyTwentyQuestionsSecret(freshTwentyQuestionsState(), "giraffe");
+    s = applyTwentyQuestionsQuestion(s, "Is it big?");
+    s = applyTwentyQuestionsAnswer(s, "yes");
+    const { state, over } = applyTwentyQuestionsGuess(s, "giraffe");
+    expect(over).toBe(true);
+    expect(state.winner).toBe("O");
   });
 });

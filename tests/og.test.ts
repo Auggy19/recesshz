@@ -38,12 +38,16 @@ describe("gameKeyFromParam", () => {
     expect(gameKeyFromParam("rnb")).toBe("red_or_black");
     expect(gameKeyFromParam("pong")).toBe("pong");
     expect(gameKeyFromParam("ping-pong")).toBe("pong");
+    expect(gameKeyFromParam("twenty_questions")).toBe("twenty_questions");
+    expect(gameKeyFromParam("twenty-questions")).toBe("twenty_questions");
+    expect(gameKeyFromParam("20-questions")).toBe("twenty_questions");
+    expect(gameKeyFromParam("tq")).toBe("twenty_questions");
   });
 
   test("returns null for missing or unknown values", () => {
     expect(gameKeyFromParam(null)).toBeNull();
     expect(gameKeyFromParam("")).toBeNull();
-    expect(gameKeyFromParam("twenty_questions")).toBeNull();
+    expect(gameKeyFromParam("truth_or_dare")).toBeNull();
     expect(gameKeyFromParam("tictactoe")).toBeNull(); // no separators
   });
 });
@@ -69,6 +73,12 @@ describe("template copy (spec)", () => {
     expect(gameInviteMeta("red_or_black").image).toBe("/og-red-or-black.png");
     expect(gameInviteMeta("pong").title).toBe("Pong — Your Turn");
     expect(gameInviteMeta("pong").image).toBe("/og-pong.png");
+    expect(gameInviteMeta("twenty_questions").title).toBe(
+      "Twenty Questions — Your Turn",
+    );
+    expect(gameInviteMeta("twenty_questions").image).toBe(
+      "/og-twenty-questions.png",
+    );
   });
 
   test("game invite with an unknown game type falls back gracefully", () => {
@@ -103,6 +113,12 @@ describe("resolveOgMeta — which template for which URL", () => {
     );
     expect(resolveOgMeta("?room=X&game=pong").title).toBe("Pong — Your Turn");
     expect(resolveOgMeta("?room=X&game=pong").image).toBe("/og-pong.png");
+    expect(resolveOgMeta("?room=X&game=twenty-questions").title).toBe(
+      "Twenty Questions — Your Turn",
+    );
+    expect(resolveOgMeta("?room=X&game=twenty-questions").image).toBe(
+      "/og-twenty-questions.png",
+    );
   });
 
   test("bare root (no params) -> brand card", () => {
@@ -120,7 +136,7 @@ describe("resolveOgMeta — which template for which URL", () => {
   });
 
   test("unknown game -> brand", () => {
-    expect(resolveOgMeta("?room=X&game=twenty_questions").title).toBe(
+    expect(resolveOgMeta("?room=X&game=truth_or_dare").title).toBe(
       OG_BRAND_TITLE,
     );
   });

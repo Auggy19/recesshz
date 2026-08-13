@@ -28,12 +28,14 @@ const GAME_LABELS: Record<string, string> = {
   rock_paper_scissors: "Rock Paper Scissors",
   red_or_black: "Red or Black",
   pong: "Pong",
+  twenty_questions: "Twenty Questions",
 };
 const GAME_IMAGES: Record<string, string> = {
   tic_tac_toe: "/og-tic-tac-toe.png",
   rock_paper_scissors: "/og-rock-paper-scissors.png",
   red_or_black: "/og-red-or-black.png",
   pong: "/og-pong.png",
+  twenty_questions: "/og-twenty-questions.png",
 };
 
 function labelFor(gameType: string): string {
