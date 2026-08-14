@@ -646,27 +646,35 @@ export interface HangmanOutcome {
  * Resolve one guess — a single letter or the whole word. Callers validate
  * first (game in progress, guessing player is O, phase, format, no repeats).
  * A correct letter (or word) can win the match; each miss brings the stick
- * figure one step closer to complete, where X wins.
+ * figure one step closer to complete, where X wins. Only wrong guesses ever
+ * spend a miss — a correct letter is never penalized.
  */
 export function applyHangmanGuess(
   current: HangmanState,
   guess: string,
 ): HangmanOutcome {
   const secret = current.secret ?? "";
-  const lower = guess.toLowerCase();
+  const lower = guess.trim().toLowerCase();
   const isLetter = lower.length === 1;
+  const wrong = isLetter
+    ? !secret.toLowerCase().includes(lower)
+    : lower !== secret.toLowerCase();
 
   let winner: Marker | null = null;
   let revealed = current.revealed;
   let guessed = current.guessed;
 
   if (isLetter) {
-    const inWord = secret.toLowerCase().includes(lower);
     guessed = [...guessed, lower];
     revealed = hangmanRevealed(secret, guessed);
     if (revealed.every((ch) => ch !== "_")) winner = "O";
-  } else if (lower === secret.toLowerCase()) {
+  } else if (!wrong) {
     winner = "O";
+  }
+
+  if (winner === null && !wrong) {
+    // A correct letter that hasn't solved the word yet — no penalty.
+    return { state: { ...current, guessed, revealed }, over: false };
   }
 
   if (winner === null) {

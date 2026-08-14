@@ -366,6 +366,215 @@ export function TwentyQuestionsArt({ className }: ArtProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Hangman — a gallows with a hanging stick figure and three blank letter tiles.
+// The figure mirrors the match progress (six body parts for six wrong guesses).
+// ---------------------------------------------------------------------------
+
+const HANGMAN_LIMB = 14; // limb thickness (amber), with an ink outline under it
+
+/** A thick ink line with an amber core — used for the figure's limbs. */
+function Limb({
+  x1,
+  y1,
+  x2,
+  y2,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}) {
+  return (
+    <>
+      <path
+        d={`M ${x1} ${y1} L ${x2} ${y2}`}
+        stroke={INK}
+        strokeWidth={HANGMAN_LIMB + 6}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d={`M ${x1} ${y1} L ${x2} ${y2}`}
+        stroke={AMBER}
+        strokeWidth={HANGMAN_LIMB}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </>
+  );
+}
+
+/** A chunky ink beam/post — the gallows timber. */
+function Timber({ d }: { d: string }) {
+  return (
+    <>
+      <path d={d} stroke={INK} strokeWidth={16} strokeLinecap="round" fill="none" />
+      <path d={d} stroke={WOOD} strokeWidth={10} strokeLinecap="round" fill="none" />
+    </>
+  );
+}
+
+/** A blank hangman tile with a pixel underscore — one letter slot. */
+function BlankTile({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g>
+      <rect
+        x={cx - 17}
+        y={cy - 20}
+        width={34}
+        height={40}
+        rx={11}
+        fill={AMBER}
+        stroke={INK}
+        strokeWidth={STROKE}
+      />
+      <rect
+        x={cx - 10}
+        y={cy + 1}
+        width={20}
+        height={6}
+        rx={3}
+        fill={INK}
+      />
+    </g>
+  );
+}
+
+export function HangmanArt({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 240 240" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* gallows — post, beam, base, rope */}
+        <Timber d="M 56 36 L 56 178" />
+        <Timber d="M 56 36 L 148 36" />
+        <Timber d="M 36 196 L 92 196" />
+        <path d="M 148 36 L 148 66" stroke={INK} strokeWidth={6} strokeLinecap="round" />
+        {/* head */}
+        <circle cx={148} cy={86} r={18} fill={AMBER} stroke={INK} strokeWidth={STROKE} />
+        {/* body + limbs — six parts, one per wrong guess */}
+        <Limb x1={148} y1={104} x2={148} y2={138} />
+        <Limb x1={148} y1={110} x2={126} y2={130} />
+        <Limb x1={148} y1={110} x2={170} y2={130} />
+        <Limb x1={148} y1={138} x2={132} y2={166} />
+        <Limb x1={148} y1={138} x2={164} y2={166} />
+        {/* blank letter tiles — the word the guesser is chasing */}
+        <BlankTile cx={104} cy={212} />
+        <BlankTile cx={148} cy={212} />
+        <BlankTile cx={192} cy={212} />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Word Scramble — three amber letter tiles (R · E · S) with pixel glyphs and
+// two small swap arrows — letters in motion.
+// ---------------------------------------------------------------------------
+
+/** 5x7 pixel glyphs (uppercase) rendered as chunky rects, engraved in ink. */
+const PIXEL_GLYPHS: Record<string, string[]> = {
+  R: ["11110", "10001", "10001", "11110", "10100", "10100", "10001"],
+  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+  S: ["01110", "10001", "10000", "01110", "00001", "10001", "01110"],
+};
+
+function PixelLetter({ ch, cx, cy }: { ch: string; cx: number; cy: number }) {
+  const glyph = PIXEL_GLYPHS[ch];
+  if (!glyph) return null;
+  const px = 3.1; // pixel size
+  const w = 5 * px;
+  const h = 7 * px;
+  const x0 = cx - w / 2;
+  const y0 = cy - h / 2;
+  return (
+    <g>
+      {glyph.map((row, r) =>
+        [...row].map((bit, c) =>
+          bit === "1" ? (
+            <rect
+              key={`${r}-${c}`}
+              x={x0 + c * px}
+              y={y0 + r * px}
+              width={px + 0.4}
+              height={px + 0.4}
+              rx={1.1}
+              fill={INK}
+            />
+          ) : null,
+        ),
+      )}
+    </g>
+  );
+}
+
+function ScrambleTile({
+  ch,
+  cx,
+  cy,
+  rotate,
+}: {
+  ch: string;
+  cx: number;
+  cy: number;
+  rotate: number;
+}) {
+  return (
+    <g transform={`rotate(${rotate} ${cx} ${cy})`}>
+      <rect
+        x={cx - 34}
+        y={cy - 40}
+        width={68}
+        height={80}
+        rx={20}
+        fill={AMBER}
+        stroke={INK}
+        strokeWidth={STROKE}
+      />
+      <PixelLetter ch={ch} cx={cx} cy={cy} />
+    </g>
+  );
+}
+
+export function WordScrambleArt({ className }: ArtProps) {
+  const shadowId = useId();
+  return (
+    <svg viewBox="0 0 240 240" className={className} aria-hidden>
+      <defs>
+        <DropShadow id={shadowId} />
+      </defs>
+      <g filter={`url(#${shadowId})`}>
+        {/* swap arrows — tiles are changing places */}
+        <path
+          d="M 74 74 C 96 40 152 40 174 74"
+          stroke={INK}
+          strokeWidth={6}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M 174 166 C 152 200 96 200 74 166"
+          stroke={INK}
+          strokeWidth={6}
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* arrowheads */}
+        <path d="M 170 60 L 180 74 L 162 70" stroke={INK} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M 78 180 L 68 166 L 86 170" stroke={INK} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        {/* the tiles */}
+        <ScrambleTile ch="R" cx={74} cy={120} rotate={-6} />
+        <ScrambleTile ch="E" cx={120} cy={120} rotate={0} />
+        <ScrambleTile ch="S" cx={166} cy={120} rotate={6} />
+      </g>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Truth or Dare — a "?" bubble (truth) and a star bubble (dare), overlapping.
 // No hearts — truth is a question, dare is a star.
 // ---------------------------------------------------------------------------

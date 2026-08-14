@@ -899,6 +899,263 @@ describe("submitMove — Twenty Questions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/games/:id/moves — Hangman
+// ---------------------------------------------------------------------------
+
+describe("submitMove — Hangman", () => {
+  test("createGame starts a fresh Hangman game in setup", async () => {
+    const db = new FakeDb();
+    const { slug, game } = await newGame(db, "hangman");
+    expect(game.status).toBe("waiting");
+    const state = game.state as { phase: string; secret: unknown; maxWrong: number };
+    expect(state.phase).toBe("setup");
+    expect(state.secret).toBeNull();
+    expect(state.maxWrong).toBe(6);
+    expect(slug).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test("only the setter (X) locks in the word during setup", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    // O tries to set the word — rejected.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", secret: "sneaky" }),
+      "invalid_move",
+    );
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-A",
+      secret: "  a banana split  ",
+    })) as { state: { phase: string; secret: string; revealed: string[] } };
+    expect(res.state.phase).toBe("guessing");
+    expect(res.state.secret).toBe("a banana split"); // trimmed server-side
+    expect(res.state.revealed).toEqual([
+      "_", " ", "_", "_", "_", "_", "_", "_", " ", "_", "_", "_", "_", "_",
+    ]);
+    expect(db.all("moves")).toHaveLength(1);
+  });
+
+  test("empty, over-long, or invalid secrets are rejected", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "   " }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "x".repeat(25) }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "c4t!" }),
+      "invalid_move",
+    );
+  });
+
+  test("a wrong letter counts a miss; a repeat letter is rejected", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "banana" });
+
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "z",
+    })) as { state: { wrongCount: number; guessed: string[] } };
+    expect(res.state.wrongCount).toBe(1);
+    expect(res.state.guessed).toEqual(["z"]);
+
+    // Same letter again — rejected before it touches the state.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", guess: "z" }),
+      "invalid_move",
+    );
+    // Non-letters and multi-char non-word input are rejected too.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", guess: "1" }),
+      "invalid_move",
+    );
+  });
+
+  test("the setter never guesses — only the guesser (O) submits moves", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "banana" });
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", guess: "b" }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "intruder", guess: "b" }),
+      "not_a_player",
+    );
+  });
+
+  test("six misses complete the game with X the winner", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "banana" });
+    for (const letter of ["q", "w", "e", "r", "t", "y"]) {
+      await run(submitMove, db, { slug, deviceToken: "device-B", guess: letter });
+    }
+    const state = gameBySlug(db, slug).state as { winner: string; phase: string };
+    expect(state.winner).toBe("X");
+    expect(state.phase).toBe("match_over");
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("a correct word guess completes the game with O the winner, secret revealed", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "Giraffe" });
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "  giraffe ",
+    })) as { state: { winner: string; secret: string } };
+    expect(res.state.winner).toBe("O");
+    expect(res.state.secret).toBe("Giraffe"); // revealed to the guesser now
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("the word is masked from the guesser on reads until the match ends", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "hangman");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+
+    // O reads — the word is hidden; only the pattern is visible.
+    const forB = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-B",
+    })) as { state: { secret: unknown; revealed: string[] } };
+    expect(forB.state.secret).toBeNull();
+    expect(forB.state.revealed).toEqual(["_", "_", "_", "_", "_", "_", "_"]);
+
+    // X reads — their own word is visible.
+    const forA = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-A",
+    })) as { state: { secret: unknown } };
+    expect(forA.state.secret).toBe("giraffe");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/games/:id/moves — Word Scramble
+// ---------------------------------------------------------------------------
+
+describe("submitMove — Word Scramble", () => {
+  test("createGame starts a fresh Word Scramble game in setup", async () => {
+    const db = new FakeDb();
+    const { slug, game } = await newGame(db, "word_scramble");
+    expect(game.status).toBe("waiting");
+    const state = game.state as { phase: string; scrambled: string; attemptsLeft: number };
+    expect(state.phase).toBe("setup");
+    expect(state.scrambled).toBe("");
+    expect(state.attemptsLeft).toBe(3);
+  });
+
+  test("only the setter (X) locks in the word; validation is strict", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "word_scramble");
+    // O tries to set the word — rejected.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", secret: "sneaky" }),
+      "invalid_move",
+    );
+    // Not a single word (space), too short, all-same letters.
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "two words" }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "ab" }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", secret: "aaa" }),
+      "invalid_move",
+    );
+  });
+
+  test("the server scrambles the word; the secret stays masked from the solver", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "word_scramble");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+
+    const state = gameBySlug(db, slug).state as { scrambled: string; secret: string };
+    // A permutation of the word's letters — never the original order.
+    // "giraffe" has a single a and two f's: A,E,F,F,G,I,R.
+    expect([...state.scrambled].sort().join("")).toBe("AEFFGIR");
+    expect(state.scrambled).not.toBe("GIRAFFE");
+
+    // Both players see the scrambled letters; the secret is masked for O.
+    const forB = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-B",
+    })) as { state: { secret: unknown; scrambled: string } };
+    expect(forB.state.secret).toBeNull();
+    expect(forB.state.scrambled).toBe(state.scrambled);
+    const forA = (await run(getGameState, db, {
+      slug,
+      deviceToken: "device-A",
+    })) as { state: { secret: unknown } };
+    expect(forA.state.secret).toBe("giraffe");
+  });
+
+  test("a correct answer wins O and completes the game", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "word_scramble");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "Giraffe" });
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "  giraffe ",
+    })) as { state: { winner: string; secret: string } };
+    expect(res.state.winner).toBe("O");
+    expect(res.state.secret).toBe("Giraffe"); // revealed now
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("three misses win X; repeated wrong answers are rejected", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "word_scramble");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+
+    for (const guess of ["zebra", "elephant"]) {
+      await run(submitMove, db, { slug, deviceToken: "device-B", guess });
+    }
+    // Same wrong answer twice — rejected (already tried).
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-B", guess: "zebra" }),
+      "invalid_move",
+    );
+    const res = (await run(submitMove, db, {
+      slug,
+      deviceToken: "device-B",
+      guess: "camel",
+    })) as { state: { winner: string; attemptsLeft: number } };
+    expect(res.state.attemptsLeft).toBe(0);
+    expect(res.state.winner).toBe("X");
+    expect(gameBySlug(db, slug).status).toBe("completed");
+  });
+
+  test("the setter never answers — only the solver (O) submits moves", async () => {
+    const db = new FakeDb();
+    const { slug } = await twoPlayerGame(db, "word_scramble");
+    await run(submitMove, db, { slug, deviceToken: "device-A", secret: "giraffe" });
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "device-A", guess: "giraffe" }),
+      "invalid_move",
+    );
+    await expectCode(
+      run(submitMove, db, { slug, deviceToken: "intruder", guess: "giraffe" }),
+      "not_a_player",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Play Again — a fresh game between the same two device tokens
 // ---------------------------------------------------------------------------
 

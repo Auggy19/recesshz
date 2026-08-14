@@ -24,6 +24,7 @@ import InstallPromptModal from "@/components/InstallPromptModal";
 import { Button } from "@/components/ui/button";
 import { applyOgMeta, resolveOgMeta } from "@/lib/og";
 import {
+  HangmanArt,
   HeroArt,
   PongArt,
   RedOrBlackArt,
@@ -32,6 +33,7 @@ import {
   TicTacToeArt,
   TruthOrDareArt,
   TwentyQuestionsArt,
+  WordScrambleArt,
 } from "@/components/GameArt";
 
 const fadeUp = {
@@ -70,6 +72,12 @@ function urlGameToType(raw: string | null): string | null {
     case "20-questions":
     case "tq":
       return "twenty_questions";
+    case "hangman":
+      return "hangman";
+    case "word-scramble":
+    case "word_scramble":
+    case "scramble":
+      return "word_scramble";
     default:
       return null;
   }
@@ -423,6 +431,66 @@ export default function Landing() {
             </span>
           </button>
 
+          {/* Hangman — the sixth live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("hangman")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
+              Ready to play
+            </div>
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
+              <HangmanArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Hangman</h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                One of you sets a word, the other guesses letters until the
+                figure hangs — or the word is found. Six wrong guesses.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
+              {creating === "hangman" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
+          {/* Word Scramble — the seventh live card */}
+          <button
+            type="button"
+            onClick={() => handleCreateGame("word_scramble")}
+            disabled={creating !== null}
+            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
+          >
+            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
+              Ready to play
+            </div>
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
+              <WordScrambleArt className="w-28 sm:w-36" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight">Word Scramble</h3>
+              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                One of you picks a word, the server scrambles it, and the other
+                has three attempts to unscramble it. No peeking, ever.
+              </p>
+            </div>
+            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
+              {creating === "word_scramble" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Create game
+            </span>
+          </button>
+
           {/* Twenty Questions — the fifth live card */}
           <button
             type="button"
@@ -508,7 +576,7 @@ export default function Landing() {
               aria-label="Room code"
               className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
-            <div className="flex items-center gap-1 rounded-full border border-border bg-background p-1 shadow-chip">
+            <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-background p-1 shadow-chip">
               {(
                 [
                   ["tic_tac_toe", "Tic Tac Toe"],
@@ -516,6 +584,8 @@ export default function Landing() {
                   ["red_or_black", "Red/Black"],
                   ["pong", "Pong"],
                   ["twenty_questions", "20 Qs"],
+                  ["hangman", "Hangman"],
+                  ["word_scramble", "Scramble"],
                 ] as const
               ).map(([value, label]) => (
                 <button

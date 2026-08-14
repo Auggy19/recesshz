@@ -8,7 +8,11 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  HANGMAN_MAX_WRONG,
   MAX_QUESTIONS,
+  SCRAMBLE_ATTEMPTS,
+  applyHangmanGuess,
+  applyHangmanSecret,
   applyPongReturn,
   applyPongServe,
   applyRedBlackGuess,
@@ -18,18 +22,25 @@ import {
   applyTwentyQuestionsGuess,
   applyTwentyQuestionsQuestion,
   applyTwentyQuestionsSecret,
+  applyWordScrambleGuess,
+  applyWordScrambleSecret,
   beats,
   coinFlip,
   findWinningLine,
+  freshHangmanState,
   freshPongState,
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   freshTwentyQuestionsState,
+  freshWordScrambleState,
+  hasDistinctLetters,
+  hangmanRevealed,
   isBoardFull,
   isGoodPongReturn,
   otherMarker,
   pongReturnWindow,
+  scrambleWord,
 } from "../src/convex/gameLogic";
 import type { PongShot } from "../src/convex/gameLogic";
 
@@ -505,5 +516,165 @@ describe("twenty questions", () => {
     const { state, over } = applyTwentyQuestionsGuess(s, "giraffe");
     expect(over).toBe(true);
     expect(state.winner).toBe("O");
+  });
+});
+
+// --- Hangman ---------------------------------------------------------------
+
+describe("hangman", () => {
+  test("fresh state: setup phase, no word, six wrong guesses allowed", () => {
+    const s = freshHangmanState();
+    expect(s.phase).toBe("setup");
+    expect(s.secret).toBeNull();
+    expect(s.revealed).toEqual([]);
+    expect(s.guessed).toEqual([]);
+    expect(s.wrongCount).toBe(0);
+    expect(s.maxWrong).toBe(HANGMAN_MAX_WRONG);
+    expect(s.winner).toBeNull();
+  });
+
+  test("setting the word builds the blank pattern and opens guessing", () => {
+    const s = applyHangmanSecret(freshHangmanState(), "a cat");
+    expect(s.secret).toBe("a cat");
+    expect(s.phase).toBe("guessing");
+    // Letters are hidden; spaces pass through as themselves.
+    expect(s.revealed).toEqual(["_", " ", "_", "_", "_"]);
+  });
+
+  test("hangmanRevealed: spaces/dashes pass through, letters hide until tried", () => {
+    expect(hangmanRevealed("ice-cream", ["c"])).toEqual([
+      "_",
+      "c",
+      "_",
+      "-",
+      "c",
+      "_",
+      "_",
+      "_",
+      "_",
+    ]);
+  });
+
+  test("a correct letter reveals every occurrence and never ends the game", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "banana");
+    const { state, over } = applyHangmanGuess(s, "a");
+    expect(over).toBe(false);
+    expect(state.revealed).toEqual(["_", "a", "_", "a", "_", "a"]);
+    expect(state.wrongCount).toBe(0);
+    expect(state.winner).toBeNull();
+  });
+
+  test("a wrong letter records a miss and is tracked in guessed", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "banana");
+    const { state } = applyHangmanGuess(s, "z");
+    expect(state.wrongCount).toBe(1);
+    expect(state.guessed).toEqual(["z"]);
+    expect(state.revealed).toEqual(["_", "_", "_", "_", "_", "_"]);
+  });
+
+  test("six wrong letters hang the figure — X wins", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "banana");
+    for (const letter of ["q", "w", "e", "r", "t", "y"]) {
+      const out = applyHangmanGuess(s, letter);
+      s = out.state;
+    }
+    expect(s.wrongCount).toBe(HANGMAN_MAX_WRONG);
+    expect(s.phase).toBe("match_over");
+    expect(s.winner).toBe("X");
+  });
+
+  test("revealing every letter wins O the match", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "cat");
+    s = applyHangmanGuess(s, "c").state;
+    s = applyHangmanGuess(s, "a").state;
+    const { state, over } = applyHangmanGuess(s, "t");
+    expect(over).toBe(true);
+    expect(state.phase).toBe("match_over");
+    expect(state.winner).toBe("O");
+  });
+
+  test("a correct full-word guess wins O — case-insensitive", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "Giraffe");
+    const { state, over } = applyHangmanGuess(s, "  giraffe  ");
+    expect(over).toBe(true);
+    expect(state.winner).toBe("O");
+    expect(state.phase).toBe("match_over");
+  });
+
+  test("a wrong full-word guess counts as one miss", () => {
+    let s = applyHangmanSecret(freshHangmanState(), "cat");
+    const { state } = applyHangmanGuess(s, "dog");
+    expect(state.wrongCount).toBe(1);
+    expect(state.winner).toBeNull();
+  });
+});
+
+// --- Word Scramble ---------------------------------------------------------
+
+describe("word scramble", () => {
+  test("fresh state: setup phase, no word, three attempts", () => {
+    const s = freshWordScrambleState();
+    expect(s.phase).toBe("setup");
+    expect(s.secret).toBeNull();
+    expect(s.scrambled).toBe("");
+    expect(s.attemptsLeft).toBe(SCRAMBLE_ATTEMPTS);
+    expect(s.wrongGuesses).toEqual([]);
+    expect(s.winner).toBeNull();
+  });
+
+  test("hasDistinctLetters: a word must actually be scrambleable", () => {
+    expect(hasDistinctLetters("aaa")).toBe(false);
+    expect(hasDistinctLetters("aba")).toBe(true);
+    expect(hasDistinctLetters("CAT")).toBe(true);
+  });
+
+  test("scrambleWord: a permutation, never the original order", () => {
+    // Deterministic rng (always 0) drives the shuffle: still a permutation,
+    // and the guard never returns the original arrangement.
+    for (let i = 0; i < 20; i++) {
+      const out = scrambleWord("cat", () => 0);
+      expect(out.length).toBe(3);
+      expect([...out].sort().join("")).toBe("ACT");
+      expect(out).not.toBe("CAT");
+    }
+  });
+
+  test("scrambleWord normalizes case and preserves the letter multiset", () => {
+    const out = scrambleWord("Banana");
+    expect([...out].sort().join("")).toBe("AAABNN");
+  });
+
+  test("setting the secret produces the scrambled board and opens solving", () => {
+    const s = applyWordScrambleSecret(freshWordScrambleState(), "cat");
+    expect(s.secret).toBe("cat");
+    expect(s.phase).toBe("solving");
+    expect(s.scrambled.length).toBe(3);
+    expect(s.attemptsLeft).toBe(SCRAMBLE_ATTEMPTS);
+  });
+
+  test("a correct answer wins O — case- and whitespace-insensitive", () => {
+    let s = applyWordScrambleSecret(freshWordScrambleState(), "Giraffe");
+    const { state, over } = applyWordScrambleGuess(s, "  giraffe ");
+    expect(over).toBe(true);
+    expect(state.phase).toBe("match_over");
+    expect(state.winner).toBe("O");
+  });
+
+  test("a wrong answer spends one attempt and is recorded", () => {
+    let s = applyWordScrambleSecret(freshWordScrambleState(), "cat");
+    const { state } = applyWordScrambleGuess(s, "dog");
+    expect(state.attemptsLeft).toBe(2);
+    expect(state.wrongGuesses).toEqual(["dog"]);
+    expect(state.winner).toBeNull();
+  });
+
+  test("three misses win X the match", () => {
+    let s = applyWordScrambleSecret(freshWordScrambleState(), "cat");
+    for (const guess of ["dog", "bat", "rat"]) {
+      s = applyWordScrambleGuess(s, guess).state;
+    }
+    expect(s.attemptsLeft).toBe(0);
+    expect(s.phase).toBe("match_over");
+    expect(s.winner).toBe("X");
   });
 });

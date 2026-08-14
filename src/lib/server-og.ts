@@ -20,6 +20,8 @@ export const OG_GAME_LABELS: Record<string, string> = {
   red_or_black: "Red or Black",
   pong: "Pong",
   twenty_questions: "Twenty Questions",
+  hangman: "Hangman",
+  word_scramble: "Word Scramble",
 };
 
 /** Per-game card thumbnails, falling back to the brand card. */
@@ -29,6 +31,8 @@ export const OG_GAME_IMAGES: Record<string, string> = {
   red_or_black: "/og-red-or-black.png",
   pong: "/og-pong.png",
   twenty_questions: "/og-twenty-questions.png",
+  hangman: "/og-hangman.png",
+  word_scramble: "/og-word-scramble.png",
 };
 
 export function ogLabelFor(gameType: string): string {

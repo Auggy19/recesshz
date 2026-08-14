@@ -29,6 +29,8 @@ describe("ogLabelFor", () => {
     expect(ogLabelFor("red_or_black")).toBe("Red or Black");
     expect(ogLabelFor("pong")).toBe("Pong");
     expect(ogLabelFor("twenty_questions")).toBe("Twenty Questions");
+    expect(ogLabelFor("hangman")).toBe("Hangman");
+    expect(ogLabelFor("word_scramble")).toBe("Word Scramble");
   });
 
   test("falls back to the Recess brand for unknown types", () => {

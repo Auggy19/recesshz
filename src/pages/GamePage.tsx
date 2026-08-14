@@ -2,11 +2,13 @@ import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
+  HangmanArt,
   PongArt,
   RedOrBlackArt,
   RockPaperScissorsArt,
   TicTacToeArt,
   TwentyQuestionsArt,
+  WordScrambleArt,
 } from "@/components/GameArt";
 import TicTacToePlay, {
   type Marker,
@@ -24,6 +26,12 @@ import PongPlay, {
 import TwentyQuestionsPlay, {
   type TwentyQuestionsMove,
 } from "@/components/games/TwentyQuestionsPlay";
+import HangmanPlay, {
+  type HangmanMove,
+} from "@/components/games/HangmanPlay";
+import WordScramblePlay, {
+  type WordScrambleMove,
+} from "@/components/games/WordScramblePlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
 import { api } from "@/convex/_generated/api";
@@ -106,6 +114,27 @@ interface TwentyQuestionsState {
   rematch?: { slug: string; by: string };
 }
 
+interface HangmanState {
+  phase: "setup" | "guessing" | "match_over";
+  secret: string | null;
+  revealed: string[];
+  guessed: string[];
+  wrongCount: number;
+  maxWrong: number;
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+interface WordScrambleState {
+  phase: "setup" | "solving" | "match_over";
+  secret: string | null;
+  scrambled: string;
+  attemptsLeft: number;
+  wrongGuesses: string[];
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
 interface ApiError {
   code?: string;
   message?: string;
@@ -131,11 +160,15 @@ function gameOgTitle(
   isRedBlack: boolean,
   isPong: boolean,
   isTwentyQuestions: boolean,
+  isHangman: boolean,
+  isWordScramble: boolean,
   state: TicTacToeState | null,
   rpsState: RpsState | null,
   rbState: RedBlackState | null,
   pongState: PongState | null,
   tqState: TwentyQuestionsState | null,
+  hangmanState: HangmanState | null,
+  scrambleState: WordScrambleState | null,
   myMarker: Marker | null,
 ): string {
   if (status === "waiting") return `${gameLabel} — Your Turn`;
@@ -149,7 +182,11 @@ function gameOgTitle(
           ? (pongState?.matchWinner ?? null)
           : isTwentyQuestions
             ? (tqState?.winner ?? null)
-            : (state?.winner ?? null);
+            : isHangman
+              ? (hangmanState?.winner ?? null)
+              : isWordScramble
+                ? (scrambleState?.winner ?? null)
+                : (state?.winner ?? null);
     if (winner === myMarker) return `${gameLabel} — You Win!`;
     if (winner === null) return `${gameLabel} — It's a Draw`;
     return `${gameLabel} — Your Friend Wins`;
@@ -176,6 +213,15 @@ function gameOgTitle(
           ? myMarker === "X"
           : myMarker === "O";
     return tqTurn
+      ? `${gameLabel} — Your Turn`
+      : `${gameLabel} — Waiting on Your Friend`;
+  }
+  if (isHangman || isWordScramble) {
+    // Setup belongs to the word setter (X); everything after is the guesser's.
+    const wordState = isHangman ? hangmanState : scrambleState;
+    const wordTurn =
+      wordState?.phase === "setup" ? myMarker === "X" : myMarker === "O";
+    return wordTurn
       ? `${gameLabel} — Your Turn`
       : `${gameLabel} — Waiting on Your Friend`;
   }
@@ -303,6 +349,8 @@ export default function GamePage() {
   const isRedBlack = gameType === "red_or_black";
   const isPong = gameType === "pong";
   const isTwentyQuestions = gameType === "twenty_questions";
+  const isHangman = gameType === "hangman";
+  const isWordScramble = gameType === "word_scramble";
   // RPS, Red or Black, and Pong share the same match shape (rounds + scores).
   const matchGame = isRps || isRedBlack || isPong;
   const status: GameStatus | null = game?.status ?? null;
@@ -311,6 +359,8 @@ export default function GamePage() {
   const rbState = (game?.state as RedBlackState) ?? null;
   const pongState = (game?.state as PongState) ?? null;
   const tqState = (game?.state as TwentyQuestionsState) ?? null;
+  const hangmanState = (game?.state as HangmanState) ?? null;
+  const scrambleState = (game?.state as WordScrambleState) ?? null;
   const myMarker: Marker | null = game?.me?.marker ?? me?.marker ?? null;
   const matchWinner: Marker | null = matchGame
     ? isRps
@@ -324,7 +374,11 @@ export default function GamePage() {
     ? matchWinner !== null
     : isTwentyQuestions
       ? tqState !== null && tqState.winner !== null
-      : state !== null && (state.winner !== null || state.draw);
+      : isHangman
+        ? hangmanState !== null && hangmanState.winner !== null
+        : isWordScramble
+          ? scrambleState !== null && scrambleState.winner !== null
+          : state !== null && (state.winner !== null || state.draw);
 
   const gameLabel = isRps
     ? "Rock Paper Scissors"
@@ -334,7 +388,11 @@ export default function GamePage() {
         ? "Pong"
         : isTwentyQuestions
           ? "Twenty Questions"
-          : "Tic Tac Toe";
+          : isHangman
+            ? "Hangman"
+            : isWordScramble
+              ? "Word Scramble"
+              : "Tic Tac Toe";
 
   // Record the streak exactly once when a game completes — the ref guards
   // against the reactive query re-delivering the same terminal state, while
@@ -362,11 +420,15 @@ export default function GamePage() {
       isRedBlack,
       isPong,
       isTwentyQuestions,
+      isHangman,
+      isWordScramble,
       state,
       rpsState,
       rbState,
       pongState,
       tqState,
+      hangmanState,
+      scrambleState,
       myMarker,
     );
     applyOgMeta(
@@ -378,7 +440,7 @@ export default function GamePage() {
       },
       shareUrl,
     );
-  }, [status, isRps, isRedBlack, isPong, isTwentyQuestions, state, rpsState, rbState, pongState, tqState, myMarker, gameLabel, gameType, shareUrl]);
+  }, [status, isRps, isRedBlack, isPong, isTwentyQuestions, isHangman, isWordScramble, state, rpsState, rbState, pongState, tqState, hangmanState, scrambleState, myMarker, gameLabel, gameType, shareUrl]);
 
   // Clear transient move errors after a moment.
   useEffect(() => {
@@ -439,6 +501,12 @@ export default function GamePage() {
       return false;
     }
   };
+
+  // Hangman and Word Scramble moves are a subset of the Twenty Questions
+  // move shape ({ secret } | { guess }), so they share the same handler.
+  const handleWordMove = async (
+    move: HangmanMove | WordScrambleMove,
+  ): Promise<boolean> => handleTqMove(move);
 
   const handleCopyLink = async () => {
     try {
@@ -569,7 +637,11 @@ export default function GamePage() {
     ? matchWinner
     : isTwentyQuestions
       ? (tqState?.winner ?? null)
-      : (state?.winner ?? null);
+      : isHangman
+        ? (hangmanState?.winner ?? null)
+        : isWordScramble
+          ? (scrambleState?.winner ?? null)
+          : (state?.winner ?? null);
   const draw = !matchGame && !isTwentyQuestions && state !== null && state.draw;
 
   const resultTitle = matchGame
@@ -592,6 +664,10 @@ export default function GamePage() {
       ? winner === myMarker
         ? "Silence never felt so good."
         : "The secret is out — rematch?"
+      : isHangman || isWordScramble
+        ? winner === myMarker
+          ? "Silence never felt so good."
+          : "The word is out — rematch?"
       : draw
         ? "A perfect standoff."
         : state.winner === myMarker
@@ -608,7 +684,11 @@ export default function GamePage() {
         : pongState?.rematch
     : isTwentyQuestions
       ? (tqState?.rematch ?? null)
-      : (state.rematch ?? null);
+      : isHangman
+        ? (hangmanState?.rematch ?? null)
+        : isWordScramble
+          ? (scrambleState?.rematch ?? null)
+          : (state.rematch ?? null);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -644,6 +724,10 @@ export default function GamePage() {
                   <PongArt className="w-16" />
                 ) : isTwentyQuestions ? (
                   <TwentyQuestionsArt className="w-16" />
+                ) : isHangman ? (
+                  <HangmanArt className="w-16" />
+                ) : isWordScramble ? (
+                  <WordScrambleArt className="w-16" />
                 ) : (
                   <TicTacToeArt className="w-16" />
                 )}
@@ -661,7 +745,11 @@ export default function GamePage() {
                         ? "You're X and serve first — first to 7 points wins."
                         : isTwentyQuestions
                           ? "You're the answerer. Pick a secret when they join — they get 20 questions to guess it."
-                          : "You're X and play first. Your board waits."}
+                          : isHangman
+                            ? "You're the word setter. Pick a word when they join — six wrong guesses and you win."
+                            : isWordScramble
+                              ? "You're the word setter. Pick a word when they join — your friend unscrambles it in three tries."
+                              : "You're X and play first. Your board waits."}
                 </p>
               </div>
             </div>
@@ -732,6 +820,20 @@ export default function GamePage() {
               status={status}
               myMarker={myMarker!}
               onSubmit={handleTqMove}
+            />
+          ) : isHangman ? (
+            <HangmanPlay
+              state={hangmanState!}
+              status={status}
+              myMarker={myMarker!}
+              onSubmit={handleWordMove}
+            />
+          ) : isWordScramble ? (
+            <WordScramblePlay
+              state={scrambleState!}
+              status={status}
+              myMarker={myMarker!}
+              onSubmit={handleWordMove}
             />
           ) : (
             <TicTacToePlay

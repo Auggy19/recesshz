@@ -42,6 +42,10 @@ describe("gameKeyFromParam", () => {
     expect(gameKeyFromParam("twenty-questions")).toBe("twenty_questions");
     expect(gameKeyFromParam("20-questions")).toBe("twenty_questions");
     expect(gameKeyFromParam("tq")).toBe("twenty_questions");
+    expect(gameKeyFromParam("hangman")).toBe("hangman");
+    expect(gameKeyFromParam("word-scramble")).toBe("word_scramble");
+    expect(gameKeyFromParam("word_scramble")).toBe("word_scramble");
+    expect(gameKeyFromParam("scramble")).toBe("word_scramble");
   });
 
   test("returns null for missing or unknown values", () => {
@@ -79,6 +83,12 @@ describe("template copy (spec)", () => {
     expect(gameInviteMeta("twenty_questions").image).toBe(
       "/og-twenty-questions.png",
     );
+    expect(gameInviteMeta("hangman").title).toBe("Hangman — Your Turn");
+    expect(gameInviteMeta("hangman").image).toBe("/og-hangman.png");
+    expect(gameInviteMeta("word_scramble").title).toBe(
+      "Word Scramble — Your Turn",
+    );
+    expect(gameInviteMeta("word_scramble").image).toBe("/og-word-scramble.png");
   });
 
   test("game invite with an unknown game type falls back gracefully", () => {

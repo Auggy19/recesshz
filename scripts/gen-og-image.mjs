@@ -38,6 +38,7 @@ const AMBER = [0xf5, 0xa6, 0x23];
 const INK = [0x1a, 0x1a, 0x1a];
 const WHITE = [0xff, 0xff, 0xff];
 const CREAM = [0xff, 0xf9, 0xe5];
+const WOOD = [0xc9, 0x8a, 0x1e];
 
 /** A fresh canvas, pre-filled with the amber background. */
 function newCanvas() {
@@ -356,6 +357,70 @@ function drawPong(set) {
   strokeCircle(set, 600, 315, 34, 10, INK);
 }
 
+/** The Hangman scene: ink gallows with an amber stick figure and three blank
+ *  letter tiles — mirroring the HangmanArt icon. */
+function drawHangman(set) {
+  const timber = (ax, ay, bx, by, th) => {
+    line(set, ax, ay, bx, by, th + 8, INK);
+    line(set, ax, ay, bx, by, th, WOOD);
+  };
+  const limb = (ax, ay, bx, by, th) => {
+    line(set, ax, ay, bx, by, th + 8, INK);
+    line(set, ax, ay, bx, by, th, AMBER);
+  };
+  // gallows
+  timber(470, 170, 470, 440, 16);
+  timber(470, 170, 590, 170, 16);
+  timber(440, 452, 528, 452, 20);
+  line(set, 590, 170, 590, 208, 6, INK);
+  // the figure
+  fillCircle(set, 590, 230, 22, AMBER);
+  strokeCircle(set, 590, 230, 22, 10, INK);
+  limb(590, 252, 590, 310, 14);
+  limb(590, 262, 560, 292, 14);
+  limb(590, 262, 620, 292, 14);
+  limb(590, 310, 568, 358, 14);
+  limb(590, 310, 612, 358, 14);
+  // three blank letter tiles
+  for (let i = 0; i < 3; i++) {
+    const x0 = 660 + i * 62;
+    fillRoundedRect(set, x0, 402, x0 + 50, 466, 14, AMBER);
+    strokeRoundedRect(set, x0, 402, x0 + 50, 466, 14, 10, INK);
+    line(set, x0 + 12, 448, x0 + 38, 448, 8, INK);
+  }
+}
+
+/** The Word Scramble tiles: three amber letter tiles with pixel glyphs
+ *  (s · e · t) and two swap arrows — mirroring the WordScrambleArt icon. */
+function drawScramble(set) {
+  const tile = (x0, letter) => {
+    const w = 84;
+    const h = 104;
+    const y0 = 250;
+    fillRoundedRect(set, x0, y0, x0 + w, y0 + h, 20, AMBER);
+    strokeRoundedRect(set, x0, y0, x0 + w, y0 + h, 20, 10, INK);
+    const scale = 12;
+    const tw = textWidth(letter, scale, 0);
+    drawText(set, letter, x0 + (w - tw) / 2, y0 + h / 2 + (7 * scale) / 2, scale, 0, INK);
+  };
+  // swap arrows — short segments approximate the arcs
+  const th = 8;
+  line(set, 500, 218, 585, 195, th, INK);
+  line(set, 585, 195, 670, 195, th, INK);
+  line(set, 670, 195, 755, 218, th, INK);
+  line(set, 755, 218, 762, 205, th, INK);
+  line(set, 755, 218, 747, 205, th, INK);
+  line(set, 500, 389, 585, 412, th, INK);
+  line(set, 585, 412, 670, 412, th, INK);
+  line(set, 670, 412, 755, 389, th, INK);
+  line(set, 500, 389, 493, 402, th, INK);
+  line(set, 500, 389, 508, 402, th, INK);
+  // the tiles
+  tile(500, "s");
+  tile(594, "e");
+  tile(688, "t");
+}
+
 /** Renders a Template 1 game card to `outFile`. */
 function renderGameCard(board, outFile) {
   const { img, set } = newCanvas();
@@ -376,6 +441,8 @@ function renderGameCard(board, outFile) {
   else if (board === "rps") drawRps(set);
   else if (board === "redblack") drawRedBlack(set);
   else if (board === "tq") drawTwentyQuestions(set);
+  else if (board === "hangman") drawHangman(set);
+  else if (board === "scramble") drawScramble(set);
   else drawPong(set);
 
   // Tagline below the card.
@@ -478,6 +545,8 @@ renderGameCard("rps", "public/og-rock-paper-scissors.png");
 renderGameCard("redblack", "public/og-red-or-black.png");
 renderGameCard("pong", "public/og-pong.png");
 renderGameCard("tq", "public/og-twenty-questions.png");
+renderGameCard("hangman", "public/og-hangman.png");
+renderGameCard("scramble", "public/og-word-scramble.png");
 renderBrandCard("public/og-app.png");
 
 // Alias kept for stale references — identical composition to the TTT card.
@@ -492,6 +561,8 @@ if (process.argv.includes("--ascii")) {
     "public/og-red-or-black.png",
     "public/og-pong.png",
     "public/og-twenty-questions.png",
+    "public/og-hangman.png",
+    "public/og-word-scramble.png",
   ];
   for (const f of files) {
     const b = readFileSync(f);

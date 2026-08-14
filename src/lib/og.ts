@@ -26,6 +26,8 @@ export const OG_GAME_NAMES: Record<string, string> = {
   red_or_black: "Red or Black",
   pong: "Pong",
   twenty_questions: "Twenty Questions",
+  hangman: "Hangman",
+  word_scramble: "Word Scramble",
 };
 
 export const OG_GAME_IMAGES: Record<string, string> = {
@@ -34,6 +36,8 @@ export const OG_GAME_IMAGES: Record<string, string> = {
   red_or_black: "/og-red-or-black.png",
   pong: "/og-pong.png",
   twenty_questions: "/og-twenty-questions.png",
+  hangman: "/og-hangman.png",
+  word_scramble: "/og-word-scramble.png",
 };
 
 export const OG_BRAND_TITLE = "Recess — Silence is safe here.";
@@ -78,6 +82,11 @@ export function gameKeyFromParam(raw: string | null): string | null {
     case "20_questions":
     case "tq":
       return "twenty_questions";
+    case "hangman":
+      return "hangman";
+    case "word_scramble":
+    case "scramble":
+      return "word_scramble";
     default:
       return null;
   }

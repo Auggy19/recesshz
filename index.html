@@ -91,7 +91,11 @@
                   ? "pong"
                   : g === "twenty_questions" || g === "20_questions" || g === "tq"
                     ? "twenty_questions"
-                    : null;
+                    : g === "hangman"
+                      ? "hangman"
+                      : g === "word_scramble" || g === "scramble"
+                        ? "word_scramble"
+                        : null;
         if (!params.get("room") || !key) return;
         var names = {
           tic_tac_toe: "Tic Tac Toe",
@@ -99,6 +103,8 @@
           red_or_black: "Red or Black",
           pong: "Pong",
           twenty_questions: "Twenty Questions",
+          hangman: "Hangman",
+          word_scramble: "Word Scramble",
         };
         var images = {
           tic_tac_toe: "/og-tic-tac-toe.png",
@@ -106,6 +112,8 @@
           red_or_black: "/og-red-or-black.png",
           pong: "/og-pong.png",
           twenty_questions: "/og-twenty-questions.png",
+          hangman: "/og-hangman.png",
+          word_scramble: "/og-word-scramble.png",
         };
         var title = names[key] + " \u2014 Your Turn";
         var desc =

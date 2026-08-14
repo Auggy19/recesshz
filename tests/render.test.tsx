@@ -218,7 +218,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Landing", () => {
-  test("renders the hero, all four live game cards, and the room-code form", async () => {
+  test("renders the hero, all live game cards, and the room-code form", async () => {
     const { container, root } = await renderPage(<Landing />);
     const out = html(root, container);
 
@@ -228,6 +228,9 @@ describe("Landing", () => {
     expect(out).toContain("Red or Black");
     expect(out).toContain("Pong");
     expect(out).toContain("Twenty Questions");
+    expect(out).toContain("Hangman");
+    expect(out).toContain("Word Scramble");
+    expect(out).toContain("Truth or Dare");
     expect(out).toContain("Have a room code?");
     expect(out).toContain("How Recess works");
     expect(out).toContain("Silence is safe here.");
@@ -654,6 +657,210 @@ describe("GamePage — Pong", () => {
     const out = html(root, container);
     expect(out).toContain("You win the match!");
     expect(out).toContain("Final score — you 7 · friend 3.");
+    expect(out).toContain("Play again");
+    act(() => root.unmount());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GamePage — Hangman
+// ---------------------------------------------------------------------------
+
+describe("GamePage — Hangman", () => {
+  const freshHangman = {
+    phase: "setup",
+    secret: null,
+    revealed: [],
+    guessed: [],
+    wrongCount: 0,
+    maxWrong: 6,
+    winner: null,
+  } as Record<string, unknown>;
+
+  test("the waiting room explains the setter role", async () => {
+    const { container, root } = await renderGamePage({
+      status: "waiting",
+      gameType: "hangman",
+      state: freshHangman,
+      me: { role: "initiator", marker: "X" },
+    });
+    const out = html(root, container);
+    expect(out).toContain("You're the word setter");
+    expect(out).toContain("Send this link to your friend");
+    act(() => root.unmount());
+  });
+
+  test("setup: the setter picks a word, the guesser waits", async () => {
+    const { container, root } = await renderGamePage({
+      status: "in_progress",
+      gameType: "hangman",
+      state: freshHangman,
+      me: { role: "initiator", marker: "X" },
+    });
+    let out = html(root, container);
+    expect(out).toContain("Think of a word or phrase.");
+    expect(out).toContain("Lock it in");
+    act(() => root.unmount());
+
+    const { container: c2, root: r2 } = await renderGamePage(
+      {
+        status: "in_progress",
+        gameType: "hangman",
+        state: freshHangman,
+        me: { role: "responder", marker: "O" },
+      },
+      async () => ({ joined: true, me: { role: "responder", marker: "O" } }),
+    );
+    out = html(r2, c2);
+    expect(out).toContain("Your friend is picking a word…");
+    act(() => r2.unmount());
+  });
+
+  test("the guesser's letter click submits the real move", async () => {
+    const { container, root } = await renderGamePage(
+      {
+        status: "in_progress",
+        gameType: "hangman",
+        state: {
+          phase: "guessing",
+          secret: null, // masked for O
+          revealed: ["_", "_", "_", "_", "_", "_"],
+          guessed: [],
+          wrongCount: 0,
+          maxWrong: 6,
+          winner: null,
+        },
+        me: { role: "responder", marker: "O" },
+      },
+      async () => ({ joined: true, me: { role: "responder", marker: "O" } }),
+    );
+    const out = html(root, container);
+    expect(out).toContain("0 of 6 wrong");
+
+    clickAria(container, "Guess a");
+    await flush();
+
+    const move = mutationCalls.find((c) => c.slot === 1);
+    expect(move).toBeDefined();
+    expect(move!.args[0]).toMatchObject({ guess: "a" });
+    act(() => root.unmount());
+  });
+
+  test("match over reveals the word and the winner", async () => {
+    const { container, root } = await renderGamePage(
+      {
+        status: "completed",
+        gameType: "hangman",
+        state: {
+          phase: "match_over",
+          secret: "banana",
+          revealed: ["_", "a", "_", "a", "_", "a"],
+          guessed: ["a", "q", "w"],
+          wrongCount: 2,
+          maxWrong: 6,
+          winner: "O",
+        },
+        me: { role: "responder", marker: "O" },
+      },
+      async () => ({ joined: true, me: { role: "responder", marker: "O" } }),
+    );
+    const out = html(root, container);
+    expect(out).toContain("You solved it!");
+    expect(out).toContain("The word was:");
+    expect(out).toContain("banana");
+    expect(out).toContain("Play again");
+    act(() => root.unmount());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GamePage — Word Scramble
+// ---------------------------------------------------------------------------
+
+describe("GamePage — Word Scramble", () => {
+  const freshScramble = {
+    phase: "setup",
+    secret: null,
+    scrambled: "",
+    attemptsLeft: 3,
+    wrongGuesses: [],
+    winner: null,
+  } as Record<string, unknown>;
+
+  test("the waiting room explains the setter role", async () => {
+    const { container, root } = await renderGamePage({
+      status: "waiting",
+      gameType: "word_scramble",
+      state: freshScramble,
+      me: { role: "initiator", marker: "X" },
+    });
+    const out = html(root, container);
+    expect(out).toContain("You're the word setter");
+    act(() => root.unmount());
+  });
+
+  test("setup: the setter picks a word, the solver waits", async () => {
+    const { container, root } = await renderGamePage({
+      status: "in_progress",
+      gameType: "word_scramble",
+      state: freshScramble,
+      me: { role: "initiator", marker: "X" },
+    });
+    const out = html(root, container);
+    expect(out).toContain("Pick a single word.");
+    expect(out).toContain("Scramble it");
+    act(() => root.unmount());
+  });
+
+  test("the solver sees the scrambled letters and their attempts", async () => {
+    const { container, root } = await renderGamePage(
+      {
+        status: "in_progress",
+        gameType: "word_scramble",
+        state: {
+          phase: "solving",
+          secret: null, // masked for O
+          scrambled: "EFFGIRA",
+          attemptsLeft: 2,
+          wrongGuesses: ["zebra"],
+          winner: null,
+        },
+        me: { role: "responder", marker: "O" },
+      },
+      async () => ({ joined: true, me: { role: "responder", marker: "O" } }),
+    );
+    const out = html(root, container);
+    expect(out).toContain("Unscramble the word");
+    // Each scrambled letter renders in its own tile.
+    for (const ch of "EFFGIRA") {
+      expect(out).toContain(`>${ch}</span>`);
+    }
+    expect(out).toContain("2 attempts left");
+    expect(out).toContain("zebra");
+    act(() => root.unmount());
+  });
+
+  test("match over reveals the word and the winner", async () => {
+    const { container, root } = await renderGamePage(
+      {
+        status: "completed",
+        gameType: "word_scramble",
+        state: {
+          phase: "match_over",
+          secret: "giraffe",
+          scrambled: "EFFGIRA",
+          attemptsLeft: 2,
+          wrongGuesses: ["zebra"],
+          winner: "O",
+        },
+        me: { role: "responder", marker: "O" },
+      },
+      async () => ({ joined: true, me: { role: "responder", marker: "O" } }),
+    );
+    const out = html(root, container);
+    expect(out).toContain("You unscrambled it!");
+    expect(out).toContain("The word was:");
+    expect(out).toContain("giraffe");
     expect(out).toContain("Play again");
     act(() => root.unmount());
   });
