@@ -560,3 +560,264 @@ export function applyTwentyQuestionsGuess(
     over: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Hangman rules — one word setter, one guesser, six wrong guesses.
+//
+// The initiator (X) secretly picks a word or phrase. The responder (O) guesses
+// letters one at a time (or the whole word); the server judges every guess
+// automatically, so the setter just watches. A letter that's in the word
+// reveals every occurrence; a miss adds a body part. Six misses hangs the
+// stick figure and X wins; revealing every letter (or a correct full-word
+// guess) wins O. The word stays masked from O until the match ends.
+// ---------------------------------------------------------------------------
+
+export const HANGMAN_GAME_TYPE = "hangman" as const;
+
+/** Wrong guesses before the stick figure is complete. */
+export const HANGMAN_MAX_WRONG = 6;
+/** Longest allowed secret (2–24 letters, spaces, dashes, apostrophes). */
+export const HANGMAN_SECRET_MAX = 24;
+/** Longest allowed guess. */
+export const HANGMAN_GUESS_MAX = 40;
+
+export type HangmanPhase = "setup" | "guessing" | "match_over";
+
+export interface HangmanState {
+  phase: HangmanPhase;
+  /** The setter's word — masked from the guesser until the match ends. */
+  secret: string | null;
+  /** The word as it stands: letters, spaces/dashes pass through, unknown
+   *  letters are "_". */
+  revealed: string[];
+  /** Every letter tried so far (lowercase, in order). */
+  guessed: string[];
+  /** Number of wrong guesses so far. */
+  wrongCount: number;
+  maxWrong: number;
+  /** Match winner — X (six misses) or O (solved). */
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+export function freshHangmanState(): HangmanState {
+  return {
+    phase: "setup",
+    secret: null,
+    revealed: [],
+    guessed: [],
+    wrongCount: 0,
+    maxWrong: HANGMAN_MAX_WRONG,
+    winner: null,
+  };
+}
+
+/** Letters are revealed; spaces and dashes pass through as themselves. */
+function isHangmanLetter(ch: string): boolean {
+  return /[a-z]/i.test(ch);
+}
+
+/** Build the revealed pattern for a secret given the tried letters. */
+export function hangmanRevealed(secret: string, guessed: string[]): string[] {
+  return [...secret].map((ch) =>
+    isHangmanLetter(ch) && !guessed.includes(ch.toLowerCase()) ? "_" : ch,
+  );
+}
+
+/** Lock in the setter's word and open the floor to guesses. */
+export function applyHangmanSecret(
+  current: HangmanState,
+  secret: string,
+): HangmanState {
+  return {
+    ...current,
+    secret,
+    revealed: hangmanRevealed(secret, []),
+    phase: "guessing",
+  };
+}
+
+export interface HangmanOutcome {
+  state: HangmanState;
+  over: boolean;
+}
+
+/**
+ * Resolve one guess — a single letter or the whole word. Callers validate
+ * first (game in progress, guessing player is O, phase, format, no repeats).
+ * A correct letter (or word) can win the match; each miss brings the stick
+ * figure one step closer to complete, where X wins.
+ */
+export function applyHangmanGuess(
+  current: HangmanState,
+  guess: string,
+): HangmanOutcome {
+  const secret = current.secret ?? "";
+  const lower = guess.toLowerCase();
+  const isLetter = lower.length === 1;
+
+  let winner: Marker | null = null;
+  let revealed = current.revealed;
+  let guessed = current.guessed;
+
+  if (isLetter) {
+    const inWord = secret.toLowerCase().includes(lower);
+    guessed = [...guessed, lower];
+    revealed = hangmanRevealed(secret, guessed);
+    if (revealed.every((ch) => ch !== "_")) winner = "O";
+  } else if (lower === secret.toLowerCase()) {
+    winner = "O";
+  }
+
+  if (winner === null) {
+    const wrongCount = current.wrongCount + 1;
+    if (wrongCount >= current.maxWrong) winner = "X";
+    return {
+      state: {
+        ...current,
+        guessed,
+        revealed,
+        wrongCount,
+        phase: winner ? "match_over" : "guessing",
+        winner,
+      },
+      over: winner !== null,
+    };
+  }
+
+  return {
+    state: { ...current, guessed, revealed, phase: "match_over", winner },
+    over: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Word Scramble rules — one word setter, one solver, three attempts.
+//
+// The initiator (X) picks a single word. The server scrambles its letters
+// (never the client, and never into the original order) and the responder (O)
+// has three attempts to unscramble it — a correct guess wins O, three misses
+// win X. The word stays masked from O until the match ends.
+// ---------------------------------------------------------------------------
+
+export const WORD_SCRAMBLE_GAME_TYPE = "word_scramble" as const;
+
+/** Attempts the solver gets before the setter wins. */
+export const SCRAMBLE_ATTEMPTS = 3;
+/** Scramble words are single words, 3–12 letters. */
+export const SCRAMBLE_SECRET_MIN = 3;
+export const SCRAMBLE_SECRET_MAX = 12;
+/** Longest allowed answer. */
+export const SCRAMBLE_GUESS_MAX = 20;
+
+export type WordScramblePhase = "setup" | "solving" | "match_over";
+
+export interface WordScrambleState {
+  phase: WordScramblePhase;
+  /** The original word — masked from the solver until the match ends. */
+  secret: string | null;
+  /** The server's shuffled letters (uppercase), shown to both players. */
+  scrambled: string;
+  /** Misses remaining (starts at SCRAMBLE_ATTEMPTS). */
+  attemptsLeft: number;
+  /** Wrong answers so far, for the solver's reference. */
+  wrongGuesses: string[];
+  /** Match winner — X (attempts exhausted) or O (solved). */
+  winner: Marker | null;
+  rematch?: { slug: string; by: string };
+}
+
+export function freshWordScrambleState(): WordScrambleState {
+  return {
+    phase: "setup",
+    secret: null,
+    scrambled: "",
+    attemptsLeft: SCRAMBLE_ATTEMPTS,
+    wrongGuesses: [],
+    winner: null,
+  };
+}
+
+/** Does the word contain at least two different letters (scrambleable)? */
+export function hasDistinctLetters(word: string): boolean {
+  return new Set(word.toLowerCase().split("")).size >= 2;
+}
+
+/**
+ * Shuffle a word's letters into a different order — never the original
+ * arrangement. `rng` is injectable so tests can drive it deterministically.
+ */
+export function scrambleWord(
+  word: string,
+  rng: () => number = Math.random,
+): string {
+  const upper = word.toUpperCase();
+  const letters = upper.split("");
+  for (let attempt = 0; attempt < 64; attempt++) {
+    for (let i = letters.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    if (letters.join("") !== upper) return letters.join("");
+  }
+  // Practically unreachable (the validator guarantees ≥2 distinct letters),
+  // but swap the first two distinct letters so a scramble always exists.
+  const out = [...letters];
+  for (let i = 0; i < out.length; i++) {
+    const j = out.findIndex((ch, k) => k > i && ch !== out[i]);
+    if (j !== -1) {
+      [out[i], out[j]] = [out[j], out[i]];
+      return out.join("");
+    }
+  }
+  return upper;
+}
+
+/** Lock in the setter's word and produce the scrambled board. */
+export function applyWordScrambleSecret(
+  current: WordScrambleState,
+  secret: string,
+): WordScrambleState {
+  return {
+    ...current,
+    secret,
+    scrambled: scrambleWord(secret),
+    phase: "solving",
+  };
+}
+
+export interface WordScrambleOutcome {
+  state: WordScrambleState;
+  over: boolean;
+}
+
+/**
+ * Resolve one answer. Callers validate first (game in progress, solving
+ * player is O, phase, format, no repeats). A correct answer wins O; each miss
+ * spends one of the three attempts, and the last one wins X.
+ */
+export function applyWordScrambleGuess(
+  current: WordScrambleState,
+  guess: string,
+): WordScrambleOutcome {
+  const correct =
+    guess.trim().toLowerCase() === (current.secret ?? "").toLowerCase();
+  if (correct) {
+    return {
+      state: { ...current, phase: "match_over", winner: "O" },
+      over: true,
+    };
+  }
+  const attemptsLeft = current.attemptsLeft - 1;
+  const winner: Marker | null = attemptsLeft <= 0 ? "X" : null;
+  return {
+    state: {
+      ...current,
+      attemptsLeft,
+      wrongGuesses: [...current.wrongGuesses, guess],
+      phase: winner ? "match_over" : "solving",
+      winner,
+    },
+    over: winner !== null,
+  };
+}

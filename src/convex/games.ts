@@ -33,6 +33,9 @@ import type {
 } from "./schema";
 import {
   GAME_TYPE,
+  HANGMAN_GAME_TYPE,
+  HANGMAN_GUESS_MAX,
+  HANGMAN_SECRET_MAX,
   MAX_QUESTIONS,
   PONG_GAME_TYPE,
   PONG_POWERS,
@@ -42,7 +45,13 @@ import {
   RED_BLACK_GAME_TYPE,
   RPS_CHOICES,
   RED_BLACK_CHOICES,
+  SCRAMBLE_GUESS_MAX,
+  SCRAMBLE_SECRET_MAX,
+  SCRAMBLE_SECRET_MIN,
   TWENTY_QUESTIONS_GAME_TYPE,
+  WORD_SCRAMBLE_GAME_TYPE,
+  applyHangmanGuess,
+  applyHangmanSecret,
   applyPongReturn,
   applyPongServe,
   applyRedBlackGuess,
@@ -52,12 +61,18 @@ import {
   applyTwentyQuestionsGuess,
   applyTwentyQuestionsQuestion,
   applyTwentyQuestionsSecret,
+  applyWordScrambleGuess,
+  applyWordScrambleSecret,
   coinFlip,
+  freshHangmanState,
   freshPongState,
   freshRedBlackState,
   freshRpsState,
   freshTicTacToeState,
   freshTwentyQuestionsState,
+  freshWordScrambleState,
+  hasDistinctLetters,
+  type HangmanState,
   type Marker,
   type PongPower,
   type PongState,
@@ -66,6 +81,7 @@ import {
   type RpsChoice,
   type RpsState,
   type TwentyQuestionsState,
+  type WordScrambleState,
   type YesNo,
 } from "./gameLogic";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -97,6 +113,8 @@ const SUPPORTED_GAME_TYPES = new Set<string>([
   RED_BLACK_GAME_TYPE,
   PONG_GAME_TYPE,
   TWENTY_QUESTIONS_GAME_TYPE,
+  HANGMAN_GAME_TYPE,
+  WORD_SCRAMBLE_GAME_TYPE,
 ]);
 
 function freshStateFor(gameType: string): unknown {
@@ -111,6 +129,10 @@ function freshStateFor(gameType: string): unknown {
       return freshPongState();
     case TWENTY_QUESTIONS_GAME_TYPE:
       return freshTwentyQuestionsState();
+    case HANGMAN_GAME_TYPE:
+      return freshHangmanState();
+    case WORD_SCRAMBLE_GAME_TYPE:
+      return freshWordScrambleState();
     default:
       return fail(
         "unsupported_game",
@@ -134,6 +156,34 @@ function maskTwentyQuestionsState(
   state: TwentyQuestionsState,
   marker: Marker | null,
 ): TwentyQuestionsState {
+  if (marker !== "X" && state.phase !== "match_over") {
+    return { ...state, secret: null };
+  }
+  return state;
+}
+
+/**
+ * Hangman masking: the word stays hidden from the guesser (O) — who only
+ * ever sees the revealed pattern — until the match ends.
+ */
+function maskHangmanState(
+  state: HangmanState,
+  marker: Marker | null,
+): HangmanState {
+  if (marker !== "X" && state.phase !== "match_over") {
+    return { ...state, secret: null };
+  }
+  return state;
+}
+
+/**
+ * Word Scramble masking: the original word stays hidden from the solver (O),
+ * who only ever sees the scrambled letters, until the match ends.
+ */
+function maskWordScrambleState(
+  state: WordScrambleState,
+  marker: Marker | null,
+): WordScrambleState {
   if (marker !== "X" && state.phase !== "match_over") {
     return { ...state, secret: null };
   }
@@ -205,7 +255,7 @@ export const createGame = mutation({
     if (!SUPPORTED_GAME_TYPES.has(gameType)) {
       fail(
         "unsupported_game",
-        `"${gameType}" isn't available yet — only Tic Tac Toe, Rock Paper Scissors, Red or Black, Pong, and Twenty Questions are supported in this build.`,
+        `"${gameType}" isn't available yet — Tic Tac Toe, Rock Paper Scissors, Red or Black, Pong, Twenty Questions, Hangman, and Word Scramble are the games in this build.`,
       );
     }
     if (!deviceToken || deviceToken.length < 8) {
@@ -357,17 +407,30 @@ export const getGameState = query({
       game.gameType === TWENTY_QUESTIONS_GAME_TYPE
         ? (game.state as TwentyQuestionsState)
         : null;
+    const hangmanState =
+      game.gameType === HANGMAN_GAME_TYPE
+        ? (game.state as HangmanState)
+        : null;
+    const scrambleState =
+      game.gameType === WORD_SCRAMBLE_GAME_TYPE
+        ? (game.state as WordScrambleState)
+        : null;
 
     return {
       status: game.status,
       gameType: game.gameType,
       // RPS picks are masked until both players have submitted this round;
-      // the Twenty Questions secret is masked from the asker until the end.
+      // the Twenty Questions / Hangman / Word Scramble secrets are masked
+      // from the guesser until the match ends.
       state: rpsState
         ? maskRpsState(rpsState)
         : tqState
           ? maskTwentyQuestionsState(tqState, me?.marker ?? null)
-          : game.state,
+          : hangmanState
+            ? maskHangmanState(hangmanState, me?.marker ?? null)
+            : scrambleState
+              ? maskWordScrambleState(scrambleState, me?.marker ?? null)
+              : game.state,
       me: me
         ? {
             role: me.role,
@@ -457,6 +520,12 @@ export const submitMove = mutation({
         answer,
         guess,
       });
+    }
+    if (game.gameType === HANGMAN_GAME_TYPE) {
+      return await submitHangmanMove(ctx, game, player, { secret, guess });
+    }
+    if (game.gameType === WORD_SCRAMBLE_GAME_TYPE) {
+      return await submitWordScrambleMove(ctx, game, player, { secret, guess });
     }
 
     // Tic Tac Toe — cell-based move.
@@ -835,6 +904,199 @@ async function submitTwentyQuestions(
 
   // Unreachable — the exactly-one-field check above covers every path.
   fail("invalid_move", "Nothing to submit.");
+}
+
+/** A valid Hangman secret: 2–24 letters, spaces, dashes or apostrophes. */
+const HANGMAN_SECRET_RE = /^[A-Za-z][A-Za-z\s'-]*$/;
+/** A valid Word Scramble secret: one word, 3–12 letters, ≥2 distinct letters. */
+const SCRAMBLE_SECRET_RE = /^[A-Za-z]{3,12}$/;
+
+/**
+ * Hangman move. The setter (X) locks in a secret word during setup; the
+ * guesser (O) then submits single letters or whole-word guesses, which the
+ * server judges automatically — the setter never has to respond. The word is
+ * masked from O on reads until the match ends.
+ */
+async function submitHangmanMove(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  move: { secret?: string; guess?: string },
+) {
+  const state = game.state as HangmanState;
+  if (state.winner) {
+    fail("invalid_move", "This match is already over.");
+  }
+
+  const fields = [move.secret, move.guess].filter((f) => f !== undefined);
+  if (fields.length !== 1) {
+    fail(
+      "invalid_move",
+      "Send exactly one action — a secret word or a guess.",
+    );
+  }
+
+  const now = Date.now();
+  const audit = (type: string, extra: Record<string, unknown> = {}) =>
+    ctx.db.insert("moves", {
+      gameId: game._id,
+      playerId: player._id,
+      payload: { type, marker: player.marker, ...extra },
+      createdAt: now,
+    });
+  const commit = (outcome: { state: HangmanState; over: boolean }) =>
+    ctx.db.patch(game._id, {
+      state: outcome.state,
+      status: outcome.over
+        ? ("completed" as GameStatus)
+        : ("in_progress" as GameStatus),
+      updatedAt: now,
+    });
+
+  // The setter (X) picks the secret word during setup.
+  if (move.secret !== undefined) {
+    if (state.phase !== "setup") {
+      fail("invalid_move", "The word is already locked in.");
+    }
+    if (player.marker !== "X") {
+      fail("invalid_move", "Only the word setter picks the word.");
+    }
+    const secret = move.secret.trim();
+    if (
+      !HANGMAN_SECRET_RE.test(secret) ||
+      secret.length < 2 ||
+      secret.length > HANGMAN_SECRET_MAX
+    ) {
+      fail(
+        "invalid_move",
+        "Pick a word or phrase — 2 to 24 letters; spaces and dashes are fine.",
+      );
+    }
+    const outcome = { state: applyHangmanSecret(state, secret), over: false };
+    await audit("secret");
+    await commit(outcome);
+    return { ok: true, state: maskHangmanState(outcome.state, player.marker) };
+  }
+
+  // The guesser (O) submits a letter or the whole word.
+  if (player.marker !== "O") {
+    fail("invalid_move", "Only the guesser guesses.");
+  }
+  if (state.phase === "setup") {
+    fail("invalid_move", "Wait for the word first.");
+  }
+  const guess = (move.guess ?? "").trim();
+  if (!guess || guess.length > HANGMAN_GUESS_MAX) {
+    fail("invalid_move", "Guesses run 1 to 40 characters.");
+  }
+  const isLetter = guess.length === 1;
+  if (isLetter && !/[a-z]/i.test(guess)) {
+    fail("invalid_move", "Guess a letter a–z, or the whole word.");
+  }
+  if (isLetter && state.guessed.includes(guess.toLowerCase())) {
+    fail("invalid_move", "You already tried that letter.");
+  }
+
+  const outcome = applyHangmanGuess(state, guess);
+  await audit(isLetter ? "letter" : "word", { guess });
+  await commit(outcome);
+  return { ok: true, state: maskHangmanState(outcome.state, player.marker) };
+}
+
+/**
+ * Word Scramble move. The setter (X) locks in a word during setup and the
+ * server scrambles its letters; the solver (O) then submits answers until one
+ * is right (O wins) or the three attempts run out (X wins). The original word
+ * is masked from O on reads until the match ends.
+ */
+async function submitWordScrambleMove(
+  ctx: MutationCtx,
+  game: Doc<"games">,
+  player: Doc<"players">,
+  move: { secret?: string; guess?: string },
+) {
+  const state = game.state as WordScrambleState;
+  if (state.winner) {
+    fail("invalid_move", "This match is already over.");
+  }
+
+  const fields = [move.secret, move.guess].filter((f) => f !== undefined);
+  if (fields.length !== 1) {
+    fail(
+      "invalid_move",
+      "Send exactly one action — a secret word or an answer.",
+    );
+  }
+
+  const now = Date.now();
+  const audit = (type: string, extra: Record<string, unknown> = {}) =>
+    ctx.db.insert("moves", {
+      gameId: game._id,
+      playerId: player._id,
+      payload: { type, marker: player.marker, ...extra },
+      createdAt: now,
+    });
+  const commit = (outcome: { state: WordScrambleState; over: boolean }) =>
+    ctx.db.patch(game._id, {
+      state: outcome.state,
+      status: outcome.over
+        ? ("completed" as GameStatus)
+        : ("in_progress" as GameStatus),
+      updatedAt: now,
+    });
+
+  // The setter (X) picks the secret word during setup.
+  if (move.secret !== undefined) {
+    if (state.phase !== "setup") {
+      fail("invalid_move", "The word is already locked in.");
+    }
+    if (player.marker !== "X") {
+      fail("invalid_move", "Only the word setter picks the word.");
+    }
+    const secret = move.secret.trim();
+    if (
+      !SCRAMBLE_SECRET_RE.test(secret) ||
+      secret.length < SCRAMBLE_SECRET_MIN ||
+      secret.length > SCRAMBLE_SECRET_MAX ||
+      !hasDistinctLetters(secret)
+    ) {
+      fail(
+        "invalid_move",
+        "Pick a single word — 3 to 12 letters, with at least two different letters.",
+      );
+    }
+    const outcome = {
+      state: applyWordScrambleSecret(state, secret),
+      over: false,
+    };
+    await audit("secret");
+    await commit(outcome);
+    return { ok: true, state: outcome.state };
+  }
+
+  // The solver (O) submits an answer.
+  if (player.marker !== "O") {
+    fail("invalid_move", "Only the solver answers.");
+  }
+  if (state.phase === "setup") {
+    fail("invalid_move", "Wait for the scrambled word first.");
+  }
+  const guess = (move.guess ?? "").trim();
+  if (!guess || guess.length > SCRAMBLE_GUESS_MAX) {
+    fail("invalid_move", "Answers run 1 to 20 characters.");
+  }
+  if (
+    state.wrongGuesses.some(
+      (g) => g.toLowerCase() === guess.toLowerCase(),
+    )
+  ) {
+    fail("invalid_move", "You already tried that answer.");
+  }
+
+  const outcome = applyWordScrambleGuess(state, guess);
+  await audit("answer", { guess });
+  await commit(outcome);
+  return { ok: true, state: maskWordScrambleState(outcome.state, player.marker) };
 }
 
 // ---------------------------------------------------------------------------
