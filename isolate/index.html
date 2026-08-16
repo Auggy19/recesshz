@@ -6,6 +6,16 @@
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <!-- Recess brand fonts — Outfit (display) + Plus Jakarta Sans (body).
+       display=swap keeps text instant on slow connections; system fallbacks
+       take over if the fonts can't load. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#F5A623" />
 
@@ -77,17 +87,33 @@
               ? "rock_paper_scissors"
               : g === "red_or_black" || g === "redblack" || g === "rnb"
                 ? "red_or_black"
-                : null;
+                : g === "pong" || g === "ping_pong"
+                  ? "pong"
+                  : g === "twenty_questions" || g === "20_questions" || g === "tq"
+                    ? "twenty_questions"
+                    : g === "hangman"
+                      ? "hangman"
+                      : g === "word_scramble" || g === "scramble"
+                        ? "word_scramble"
+                        : null;
         if (!params.get("room") || !key) return;
         var names = {
           tic_tac_toe: "Tic Tac Toe",
           rock_paper_scissors: "Rock Paper Scissors",
           red_or_black: "Red or Black",
+          pong: "Pong",
+          twenty_questions: "Twenty Questions",
+          hangman: "Hangman",
+          word_scramble: "Word Scramble",
         };
         var images = {
           tic_tac_toe: "/og-tic-tac-toe.png",
           rock_paper_scissors: "/og-rock-paper-scissors.png",
           red_or_black: "/og-red-or-black.png",
+          pong: "/og-pong.png",
+          twenty_questions: "/og-twenty-questions.png",
+          hangman: "/og-hangman.png",
+          word_scramble: "/og-word-scramble.png",
         };
         var title = names[key] + " \u2014 Your Turn";
         var desc =
@@ -109,11 +135,11 @@
       }
     })();
   </script>
-  <script type="module" crossorigin src="/assets/index-ClA4THDw.js"></script>
+  <script type="module" crossorigin src="/assets/index-DM72kPzv.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/framer-motion-D5IBGcks.js">
-  <link rel="modulepreload" crossorigin href="/assets/radix-ui-C6xrIjlF.js">
-  <link rel="modulepreload" crossorigin href="/assets/react-vendor-BaXqXJ_5.js">
-  <link rel="stylesheet" crossorigin href="/assets/index-DBlKtA2k.css">
+  <link rel="modulepreload" crossorigin href="/assets/radix-ui-pgOHfePp.js">
+  <link rel="modulepreload" crossorigin href="/assets/react-vendor-x5WeSo14.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-Pj19ygL-.css">
 </head>
 
 

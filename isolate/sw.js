@@ -12,6 +12,12 @@ const SHELL = [
   "/manifest.json",
   "/logo.svg",
   "/og-image.png",
+  "/og-app.png",
+  "/og-tic-tac-toe.png",
+  "/og-rock-paper-scissors.png",
+  "/og-red-or-black.png",
+  "/og-pong.png",
+  "/og-twenty-questions.png",
   "/apple-touch-icon.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -75,6 +81,7 @@ self.addEventListener("fetch", (event) => {
               url.pathname.startsWith("/icons/") ||
               url.pathname === "/logo.svg" ||
               url.pathname === "/og-image.png" ||
+              url.pathname.startsWith("/og-") ||
               url.pathname === "/manifest.json")
           ) {
             const copy = response.clone();
