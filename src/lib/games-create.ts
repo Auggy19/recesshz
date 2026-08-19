@@ -12,16 +12,16 @@ import {
 
 export const EXPIRY_MS = 48 * 60 * 60 * 1000;
 const ROOM_RE = /^[A-Za-z0-9_-]{3,64}$/;
-const SUPPORTED = new Set([
+const SUPPORTED: Set<string> = new Set([
   GAME_TYPE, RPS_GAME_TYPE, RED_BLACK_GAME_TYPE, PONG_GAME_TYPE,
   TWENTY_QUESTIONS_GAME_TYPE, HANGMAN_GAME_TYPE, WORD_SCRAMBLE_GAME_TYPE,
 ]);
 
-function fail(code: ApiError["code"], message: string): never {
+export function fail(code: ApiError["code"], message: string): never {
   throw new ApiError(code, message);
 }
 
-function freshStateFor(gameType: string): unknown {
+export function freshStateFor(gameType: string): unknown {
   switch (gameType) {
     case GAME_TYPE: return freshTicTacToeState();
     case RPS_GAME_TYPE: return freshRpsState();
@@ -70,7 +70,6 @@ export async function expireIfStale(game: { id: string; status: string; updated_
   }
   return false;
 }
-export { fail, freshStateFor, SUPPORTED, ROOM_RE };
 
 export async function createGame(args: { gameType: string; deviceToken: string; slug?: string }) {
   const { gameType, deviceToken, slug: requestedSlug } = args;
