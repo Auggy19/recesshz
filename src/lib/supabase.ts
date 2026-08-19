@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 
 const url =
   import.meta.env.VITE_SUPABASE_URL ??
@@ -15,5 +16,8 @@ if (!url || !anonKey) {
   );
 }
 
-/** Untyped client — schema is enforced in app code (see types/database.ts). */
-export const supabase = createClient(url || "http://localhost", anonKey || "public");
+/** Typed Supabase client (schema in types/database.ts). */
+export const supabase = createClient<Database>(
+  url || "http://localhost",
+  anonKey || "public",
+);
