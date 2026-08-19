@@ -1,20 +1,16 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
 import { ThemeProvider } from "@/hooks/use-theme";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 
-// Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const GamePage = lazy(() => import("./pages/GamePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
-// Simple loading fallback for route transitions
 function RouteLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -23,8 +19,6 @@ function RouteLoading() {
   );
 }
 
-/** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
- *  crashing the whole app (e.g. hook errors in WebContainer environment). */
 class ToolbarErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -41,7 +35,6 @@ class ToolbarErrorBoundary extends React.Component<
   }
 }
 
-/** Hard guard so runtime errors never leave the preview as a blank page. */
 class RootErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; message: string; stack: string }
@@ -79,21 +72,11 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
-
-// Register the app-shell service worker in production builds only — in dev the
-// Vite preview manages its own caching/HMR. Registration is deferred to `load`
-// and failures are swallowed (SWs are a progressive enhancement; some contexts
-// like third-party iframes disallow them).
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Ignore — PWA install/offline is best-effort.
-    });
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
-
-
 
 function RouteSyncer() {
   const location = useLocation();
@@ -118,7 +101,6 @@ function RouteSyncer() {
   return null;
 }
 
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RootErrorBoundary>
@@ -126,20 +108,17 @@ createRoot(document.getElementById("root")!).render(
         <ToolbarErrorBoundary>
           <VlyToolbar />
         </ToolbarErrorBoundary>
-        <ConvexAuthProvider client={convex}>
-          <BrowserRouter>
+        <BrowserRouter>
           <RouteSyncer />
-            <Suspense fallback={<RouteLoading />}>
-              <Routes>
-                {/* Recess is a no-login, link-based app — every route is public. */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/play/:slug" element={<GamePage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-          <Toaster />
-        </ConvexAuthProvider>
+          <Suspense fallback={<RouteLoading />}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/play/:slug" element={<GamePage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+        <Toaster />
       </ThemeProvider>
     </RootErrorBoundary>
   </StrictMode>,
