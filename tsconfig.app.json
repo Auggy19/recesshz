@@ -35,6 +35,9 @@
     "src/convex/auth.ts",
     "src/convex/auth.config.ts",
     "src/convex/auth/**",
-    "src/convex/_generated/**"
+    "src/convex/_generated/**",
+    "src/pages/Auth.tsx",
+    "src/pages/Dashboard.tsx",
+    "src/components/RequireAuth.tsx"
   ]
 }
