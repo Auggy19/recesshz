@@ -1,4 +1,10 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type GameStatus = "waiting" | "in_progress" | "completed" | "abandoned";
 export type PlayerRole = "initiator" | "responder";
@@ -33,6 +39,7 @@ export interface Database {
           status?: GameStatus;
           updated_at?: number;
         };
+        Relationships: [];
       };
       players: {
         Row: {
@@ -51,7 +58,14 @@ export interface Database {
           marker: Marker;
           joined_at: number;
         };
-        Update: Partial<Database["public"]["Tables"]["players"]["Insert"]>;
+        Update: {
+          game_id?: string;
+          device_token?: string;
+          role?: PlayerRole;
+          marker?: Marker;
+          joined_at?: number;
+        };
+        Relationships: [];
       };
       moves: {
         Row: {
@@ -68,7 +82,13 @@ export interface Database {
           payload: Json;
           created_at: number;
         };
-        Update: Partial<Database["public"]["Tables"]["moves"]["Insert"]>;
+        Update: {
+          game_id?: string;
+          player_id?: string;
+          payload?: Json;
+          created_at?: number;
+        };
+        Relationships: [];
       };
       feedback: {
         Row: {
@@ -85,9 +105,19 @@ export interface Database {
           would_play_again?: boolean | null;
           created_at: number;
         };
-        Update: Partial<Database["public"]["Tables"]["feedback"]["Insert"]>;
+        Update: {
+          game_id?: string;
+          felt_natural?: boolean | null;
+          would_play_again?: boolean | null;
+          created_at?: number;
+        };
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }
 
