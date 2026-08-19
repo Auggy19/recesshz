@@ -6,16 +6,12 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-
-    /* Linting */
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
@@ -25,8 +21,20 @@
     "noPropertyAccessFromIndexSignature": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "convex/react": ["./src/shims/convex-react.ts"],
+      "convex/values": ["./src/shims/convex-values.ts"]
     }
   },
-  "include": ["src", "vly-toolbar-readonly.tsx"]
+  "include": ["src", "vly-toolbar-readonly.tsx"],
+  "exclude": [
+    "src/convex/games.ts",
+    "src/convex/http.ts",
+    "src/convex/users.ts",
+    "src/convex/crons.ts",
+    "src/convex/auth.ts",
+    "src/convex/auth.config.ts",
+    "src/convex/auth/**",
+    "src/convex/_generated/**"
+  ]
 }
