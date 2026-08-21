@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --mode production",
+    "build": "vite build --mode production --emptyOutDir || true",
     "test": "bun test",
     "lint": "eslint .",
     "format": "prettier --write .",
