@@ -18,7 +18,8 @@ export default defineConfig({
   build: {
     sourcemap: false,
     rollupOptions: {
-      output: {
+  external: ["convex/server"],
+  output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom", "react-router"],
           "supabase-vendor": ["@supabase/supabase-js"],
