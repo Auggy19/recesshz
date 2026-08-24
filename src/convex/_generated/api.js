@@ -1,17 +1,22 @@
 /* eslint-disable */
 /**
- * Generated `api` utility.
- *
- * THIS CODE IS AUTOMATICALLY GENERATED.
- *
- * To regenerate, run `npx convex dev`.
+ * Drop-in replacement for Convex generated `api`.
+ * Points at the Supabase-backed games module so client imports keep working.
  * @module
  */
 
-import { anyApi } from "convex/server";
+import * as games from "../../lib/games-api.ts";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- */
-export const api = anyApi;
-export const internal = anyApi;
+export const api = {
+  games: {
+    createGame: games.createGame,
+    joinGame: games.joinGame,
+    getGameState: games.getGameState,
+    submitMove: games.submitMove,
+    playAgain: games.playAgain,
+    submitFeedback: games.submitFeedback,
+  },
+};
+
+/** Legacy internal namespace — unused after migration. */
+export const internal = {};
