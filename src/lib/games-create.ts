@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, requireSupabase } from "@/lib/supabase";
 import { ApiError } from "@/lib/api-error";
 import type { GameRow, GameStatus, Marker, PlayerRole, PlayerRow } from "@/types/database";
 import {
@@ -92,6 +92,7 @@ export function maskState(
 }
 
 export async function getGameBySlug(slug: string): Promise<GameRow | null> {
+  requireSupabase();
   const { data, error } = await supabase
     .from("games")
     .select("*")
@@ -134,6 +135,7 @@ export async function createGame(args: {
   deviceToken: string;
   slug?: string;
 }) {
+  requireSupabase();
   const { gameType, deviceToken, slug: requestedSlug } = args;
   if (!SUPPORTED.has(gameType)) {
     fail("unsupported_game", `"${gameType}" isn't available yet.`);
@@ -197,6 +199,7 @@ export async function createGame(args: {
 }
 
 export async function joinGame(args: { slug: string; deviceToken: string }) {
+  requireSupabase();
   const { slug, deviceToken } = args;
   const game = await getGameBySlug(slug);
   if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
@@ -248,6 +251,7 @@ export async function getGameState(args: {
   slug: string;
   deviceToken: string;
 }) {
+  requireSupabase();
   const { slug, deviceToken } = args;
   const game = await getGameBySlug(slug);
   if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
