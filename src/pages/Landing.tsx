@@ -1,5 +1,7 @@
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
+import { createGame } from "@/lib/games-api";
+import { getApiError } from "@/lib/api-error";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -80,15 +82,6 @@ function urlGameToType(raw: string | null): string | null {
   }
 }
 
-/** Pull the server's error message out of a ConvexError, if there is one. */
-function apiErrorMessage(err: unknown): string | null {
-  if (err instanceof ConvexError && typeof err.data === "object" && err.data) {
-    const message = (err.data as { message?: string }).message;
-    return message ?? null;
-  }
-  return null;
-}
-
 const upcomingGames: GameCard[] = [
   {
     name: "Truth or Dare",
@@ -111,12 +104,16 @@ export default function Landing() {
     if (creating) return;
     setCreating(gameType);
     try {
-      const { data, error } = await supabase.from('games').insert({ game_type: gameType, device_token: deviceToken }).select('slug').single(); 
-      navigate(`/play/${slug}`); const slug = data?.slug;
-    navigate(\⁠/play/${slug}`);`
+      const { slug } = await createGame({
+        gameType,
+        deviceToken,
+        ...(roomSlug ? { slug: roomSlug } : {}),
+      });
+      navigate(`/play/${slug}`);
+    } catch (err) {
       console.error("Failed to create game:", err);
       toast.error(
-        apiErrorMessage(err) ??
+        getApiError(err).message ??
           "Couldn't start a game right now. Please try again.",
       );
       setCreating(null);
@@ -130,17 +127,12 @@ export default function Landing() {
     void handleCreateGame(roomGame, code);
   };
 
-  // Open Graph: the bare root link previews as the brand card; a room link
-  // (?room=...&game=...) previews as that game's invite card. The inline head
-  // script already picked one of these before the bundle loaded — this keeps
-  // them correct for SPA re-renders and browsers that re-share the page URL.
+  // Open Graph: keep SPA re-renders + re-shares correct.
   useEffect(() => {
     applyOgMeta(resolveOgMeta(window.location.search));
   }, []);
 
-  // Instant room creation: opening /?room=XYZ&game=tic-tac-toe joins (or
-  // creates) that room and drops the player straight into the game. Runs once
-  // on mount; create-or-join means both players can open the same room link.
+  // Instant room: /?room=XYZ&game=tic-tac-toe joins or creates that room.
   useEffect(() => {
     if (roomJoinedRef.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -158,7 +150,9 @@ export default function Landing() {
       .then(({ slug }) => navigate(`/play/${slug}`))
       .catch((err) => {
         console.error("Failed to join room:", err);
-        toast.error(apiErrorMessage(err) ?? "Couldn't open that room right now.");
+        toast.error(
+          getApiError(err).message ?? "Couldn't open that room right now.",
+        );
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -187,12 +181,10 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
-        {/* Ambient warm glow behind the hero — sets the premium mood */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[36rem] bg-[radial-gradient(62%_55%_at_50%_0%,rgba(245,166,35,0.22),transparent_72%)]"
         />
-        {/* The app icon — front and center, like a launcher tile */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -238,7 +230,7 @@ export default function Landing() {
           className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
         >
           Start a game, drop the link in any chat, and your friend plays when
-          they&apos;re ready. No accounts. No downloads. No pressure.
+          they're ready. No accounts. No downloads. No pressure.
         </motion.p>
 
         <motion.div
@@ -274,7 +266,6 @@ export default function Landing() {
           </a>
         </motion.div>
 
-        {/* Hero image — two phones, one link, a floating controller */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -300,222 +291,89 @@ export default function Landing() {
           transition={{ duration: 0.4 }}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
-          {/* Tic Tac Toe — the live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("tic_tac_toe")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <TicTacToeArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">Tic Tac Toe</h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Three in a row. Pass the link, make a move, and come back when
-                it&apos;s your turn — your board waits for you.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "tic_tac_toe" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
+          {(
+            [
+              {
+                type: "tic_tac_toe",
+                name: "Tic Tac Toe",
+                blurb:
+                  "Three in a row. Pass the link, make a move, and come back when it's your turn — your board waits for you.",
+                art: <TicTacToeArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "rock_paper_scissors",
+                name: "Rock Paper Scissors",
+                blurb:
+                  "Best of three. Both of you pick in secret, and the picks only reveal once they're both in — no peeking, no arguing.",
+                art: <RockPaperScissorsArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "red_or_black",
+                name: "Red or Black",
+                blurb:
+                  "Your friend picks a color, the server deals the card, and the reveal lands in an instant. Best of three — guess right to take a round.",
+                art: <RedOrBlackArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "pong",
+                name: "Pong",
+                blurb:
+                  "Classic paddle tennis, by message. Serve an angle, read the return, and chase the rally — first to 7 points takes it.",
+                art: <PongArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "hangman",
+                name: "Hangman",
+                blurb:
+                  "One of you sets a word, the other guesses letters until the figure hangs — or the word is found. Six wrong guesses.",
+                art: <HangmanArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "word_scramble",
+                name: "Word Scramble",
+                blurb:
+                  "One of you picks a word, the server scrambles it, and the other has three attempts to unscramble it. No peeking, ever.",
+                art: <WordScrambleArt className="w-28 sm:w-36" />,
+              },
+              {
+                type: "twenty_questions",
+                name: "Twenty Questions",
+                blurb:
+                  "One of you thinks of something, the other asks yes/no questions until the guess lands — or the 20 questions run out.",
+                art: <TwentyQuestionsArt className="w-28 sm:w-36" />,
+              },
+            ] as const
+          ).map((game) => (
+            <button
+              key={game.type}
+              type="button"
+              onClick={() => handleCreateGame(game.type)}
+              disabled={creating !== null}
+              className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
+            >
+              <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
+                Ready to play
+              </div>
+              <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
+                {game.art}
+              </div>
+              <div>
+                <h3 className="text-2xl font-black tracking-tight">{game.name}</h3>
+                <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  {game.blurb}
+                </p>
+              </div>
+              <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
+                {creating === game.type ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Link2 className="size-4" />
+                )}
+                Create game
+              </span>
+            </button>
+          ))}
 
-          {/* Rock Paper Scissors — the second live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("rock_paper_scissors")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <RockPaperScissorsArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">
-                Rock Paper Scissors
-              </h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Best of three. Both of you pick in secret, and the picks only
-                reveal once they&apos;re both in — no peeking, no arguing.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "rock_paper_scissors" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Red or Black — the third live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("red_or_black")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <RedOrBlackArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">Red or Black</h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Your friend picks a color, the server deals the card, and the
-                reveal lands in an instant. Best of three — guess right to take
-                a round.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "red_or_black" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Pong — the fourth live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("pong")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <PongArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">Pong</h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Classic paddle tennis, by message. Serve an angle, read the
-                return, and chase the rally — first to 7 points takes it.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "pong" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Hangman — the sixth live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("hangman")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <HangmanArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">Hangman</h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                One of you sets a word, the other guesses letters until the
-                figure hangs — or the word is found. Six wrong guesses.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "hangman" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Word Scramble — the seventh live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("word_scramble")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <WordScrambleArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">Word Scramble</h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                One of you picks a word, the server scrambles it, and the other
-                has three attempts to unscramble it. No peeking, ever.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "word_scramble" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Twenty Questions — the fifth live card */}
-          <button
-            type="button"
-            onClick={() => handleCreateGame("twenty_questions")}
-            disabled={creating !== null}
-            className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-          >
-            <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-              Ready to play
-            </div>
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-              <TwentyQuestionsArt className="w-28 sm:w-36" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black tracking-tight">
-                Twenty Questions
-              </h3>
-              <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                One of you thinks of something, the other asks yes/no questions
-                until the guess lands — or the 20 questions run out.
-              </p>
-            </div>
-            <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-              {creating === "twenty_questions" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Link2 className="size-4" />
-              )}
-              Create game
-            </span>
-          </button>
-
-          {/* Coming soon — each game gets its illustration */}
           {upcomingGames.map((game) => (
             <div
               key={game.name}
@@ -610,7 +468,7 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* Brand mood — the swing set */}
+      {/* Brand mood */}
       <section className="mx-auto w-full max-w-5xl px-5 pb-16">
         <motion.div
           {...fadeUp}
@@ -699,12 +557,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 px-5 py-10 text-center">
         <Wordmark size="sm" />
-        <p className="text-sm text-muted-foreground">
-          Silence is safe here.
-        </p>
+        <p className="text-sm text-muted-foreground">Silence is safe here.</p>
         <InstallPromptModal
           renderTrigger={(open) => (
             <button
