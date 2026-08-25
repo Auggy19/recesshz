@@ -312,6 +312,9 @@ export function applyRedBlackGuess(
 // in play, so the point goes to the returner if their return mirrors the
 // incoming angle closely enough, otherwise to the server. The point winner
 // serves the next point; first to seven points takes the match.
+//
+// Designed to be easy and fun: return windows are wide so almost any
+// reasonable mirror works. Power still matters a little but never feels harsh.
 // ---------------------------------------------------------------------------
 
 export const PONG_GAME_TYPE = "pong" as const;
@@ -367,14 +370,19 @@ export function freshPongState(): PongState {
 
 /**
  * How close (in degrees) the return must come to the serve's mirror for the
- * return to count. Faster serves and harder returns both shrink the window —
- * a smash is risky, a lob is easy to read.
+ * return to count.
+ *
+ * Tuned to be generous so the game feels easy and fun:
+ *   Lob vs Lob   → 40°
+ *   Drive vs Drive → 30°
+ *   Smash vs Smash → 20°
+ * Minimum floor of 15° so even the hardest combination stays playable.
  */
 export function pongReturnWindow(
   servePower: PongPower,
   returnPower: PongPower,
 ): number {
-  return Math.max(4, 24 - (servePower - 1) * 6 - (returnPower - 1) * 2);
+  return Math.max(15, 40 - (servePower - 1) * 5 - (returnPower - 1) * 5);
 }
 
 /** A return is good when it mirrors the incoming angle within the window. */
