@@ -1,8 +1,5 @@
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
-import { api } from "@/convex/_generated/api";
-import { useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -104,7 +101,6 @@ export default function Landing() {
   const navigate = useNavigate();
   const deviceToken = useDeviceToken();
   const { streak } = useStreak();
-  const createGame = useMutation(api.games.createGame);
   const [creating, setCreating] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
   const [roomGame, setRoomGame] = useState<string>("tic_tac_toe");
@@ -115,13 +111,9 @@ export default function Landing() {
     if (creating) return;
     setCreating(gameType);
     try {
-      const { slug } = await createGame({
-        gameType,
-        deviceToken,
-        ...(roomSlug ? { slug: roomSlug } : {}),
-      });
-      navigate(`/play/${slug}`);
-    } catch (err) {
+      const { data, error } = await supabase.from('games').insert({ game_type: gameType, device_token: deviceToken }).select('slug').single(); 
+      navigate(`/play/${slug}`); const slug = data?.slug;
+    navigate(\⁠/play/${slug}`);`
       console.error("Failed to create game:", err);
       toast.error(
         apiErrorMessage(err) ??
