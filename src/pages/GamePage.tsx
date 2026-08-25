@@ -34,7 +34,6 @@ import WordScramblePlay, {
 } from "@/components/games/WordScramblePlay";
 import InstallPromptModal from "@/components/InstallPromptModal";
 import FloatingVideo from "@/components/FloatingVideo";
-import { api } from "@/convex/_generated/api";
 import {
   OG_BRAND_IMAGE,
   OG_CHALLENGE_DESCRIPTION,
@@ -43,11 +42,6 @@ import {
 } from "@/lib/og";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
-import {
-  useMutation,
-  useQuery_experimental as useQuery,
-} from "convex/react";
-import { ConvexError } from "convex/values";
 import {
   ArrowLeft,
   Check,
