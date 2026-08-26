@@ -40,6 +40,15 @@ import {
   OG_GAME_IMAGES,
   applyOgMeta,
 } from "@/lib/og";
+import {
+  joinGame,
+  getGameState,
+  submitMove,
+  playAgain,
+  submitFeedback,
+  subscribeGame,
+} from "@/lib/games-api";
+import { getApiError } from "@/lib/api-error";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
 import {
@@ -52,7 +61,7 @@ import {
   MessageCircle,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -129,24 +138,17 @@ interface WordScrambleState {
   rematch?: { slug: string; by: string };
 }
 
-interface ApiError {
-  code?: string;
-  message?: string;
+interface GameSnapshot {
+  status: GameStatus;
+  gameType: string;
+  state: unknown;
+  me: {
+    role: PlayerRole;
+    marker: Marker;
+    picked?: boolean;
+  } | null;
 }
 
-function getApiError(err: unknown): ApiError {
-  if (err instanceof ConvexError) {
-    const data = err.data as ApiError;
-    return { code: data?.code, message: data?.message };
-  }
-  if (err instanceof Error) return { message: err.message };
-  return { message: "Something went wrong. Please try again." };
-}
-
-/**
- * Status-aware share title for the game invite template: "[Game] — Your Turn"
- * whenever it's an invite or genuinely your move; win/loss/draw once it's over.
- */
 function gameOgTitle(
   status: GameStatus | null,
   gameLabel: string,
@@ -185,7 +187,6 @@ function gameOgTitle(
     if (winner === null) return `${gameLabel} — It's a Draw`;
     return `${gameLabel} — Your Friend Wins`;
   }
-  // in_progress
   if (isPong) {
     return pongState?.turn === myMarker
       ? `${gameLabel} — Your Turn`
@@ -193,13 +194,11 @@ function gameOgTitle(
   }
   if (isRps) return `${gameLabel} — Your Turn`;
   if (isRedBlack) {
-    // Only the guesser (O) ever has a turn in Red or Black.
     return rbState?.phase === "picking" && myMarker === "O"
       ? `${gameLabel} — Your Turn`
       : `${gameLabel} — Waiting on Your Friend`;
   }
   if (isTwentyQuestions) {
-    // Setup: X picks the secret. Asking/final: whoever has the floor.
     const tqTurn =
       tqState?.phase === "setup"
         ? myMarker === "X"
@@ -211,7 +210,6 @@ function gameOgTitle(
       : `${gameLabel} — Waiting on Your Friend`;
   }
   if (isHangman || isWordScramble) {
-    // Setup belongs to the word setter (X); everything after is the guesser's.
     const wordState = isHangman ? hangmanState : scrambleState;
     const wordTurn =
       wordState?.phase === "setup" ? myMarker === "X" : myMarker === "O";
@@ -230,10 +228,6 @@ function gameOgDescription(status: GameStatus | null): string {
   }
   return OG_CHALLENGE_DESCRIPTION;
 }
-
-// ---------------------------------------------------------------------------
-// Small pieces
-// ---------------------------------------------------------------------------
 
 function FullPageMessage({
   icon,
@@ -266,48 +260,53 @@ function FullPageMessage({
   );
 }
 
-// ---------------------------------------------------------------------------
-// The game page
-// ---------------------------------------------------------------------------
-
 export default function GamePage() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
   const deviceToken = useDeviceToken();
 
-  const joinGame = useMutation(api.games.joinGame);
-  const submitMove = useMutation(api.games.submitMove);
-  const playAgain = useMutation(api.games.playAgain);
-  const submitFeedback = useMutation(api.games.submitFeedback);
-
   const [joinStatus, setJoinStatus] = useState<"joining" | "joined" | "error">(
     "joining",
   );
-  const [joinError, setJoinError] = useState<ApiError>({});
+  const [joinError, setJoinError] = useState<{ code?: string; message?: string }>(
+    {},
+  );
   const [me, setMe] = useState<{ role: PlayerRole; marker: Marker } | null>(
     null,
   );
+  const [game, setGame] = useState<GameSnapshot | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [feedbackSent, setFeedbackSent] = useState<boolean | null>(null);
   const [creatingRematch, setCreatingRematch] = useState(false);
 
-  // Daily streak — recorded once per completed game (idempotent per day).
   const { streak, registerPlay } = useStreak();
   const streakRecordedRef = useRef(false);
 
-  // Reset join state when the slug changes (e.g. following a rematch link) —
-  // a render-time adjustment, the React-recommended pattern for prop-derived
-  // state, so the effect itself never calls setState synchronously.
   const [prevSlug, setPrevSlug] = useState(slug);
   if (prevSlug !== slug) {
     setPrevSlug(slug);
     setJoinStatus("joining");
     setJoinError({});
+    setGame(null);
+    setLoadError(null);
+    setMe(null);
+    setFeedbackSent(null);
+    setCreatingRematch(false);
   }
 
-  // Join (or re-join) the game with this device's token. Idempotent, so
-  // re-opening the link or a retry is safe. New devices on a full game are
-  // rejected server-side.
+  const refreshGame = useCallback(async () => {
+    if (!slug || !deviceToken) return;
+    try {
+      const data = await getGameState({ slug, deviceToken });
+      setGame(data as GameSnapshot);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(getApiError(err).message ?? "Couldn't load this game.");
+    }
+  }, [slug, deviceToken]);
+
+  // Join (idempotent)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -325,19 +324,21 @@ export default function GamePage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, deviceToken, joinGame]);
+  }, [slug, deviceToken]);
 
-  // Reactive game state — updates the instant the opponent moves.
-  const query = useQuery({
-    query: api.games.getGameState,
-    args: joinStatus === "joined" ? { slug, deviceToken } : "skip",
-  });
+  // Initial load + realtime updates once joined
+  useEffect(() => {
+    if (joinStatus !== "joined") return;
+    void refreshGame();
+    const unsub = subscribeGame(slug, () => {
+      void refreshGame();
+    });
+    return unsub;
+  }, [joinStatus, slug, refreshGame]);
 
-  // Fresh link for sharing (also used for the OG preview).
   const shareUrl =
     typeof window !== "undefined" ? `${window.location.origin}/play/${slug}` : "";
 
-  const game = query.status === "success" ? query.data : null;
   const gameType = game?.gameType ?? "tic_tac_toe";
   const isRps = gameType === "rock_paper_scissors";
   const isRedBlack = gameType === "red_or_black";
@@ -345,7 +346,6 @@ export default function GamePage() {
   const isTwentyQuestions = gameType === "twenty_questions";
   const isHangman = gameType === "hangman";
   const isWordScramble = gameType === "word_scramble";
-  // RPS, Red or Black, and Pong share the same match shape (rounds + scores).
   const matchGame = isRps || isRedBlack || isPong;
   const status: GameStatus | null = game?.status ?? null;
   const state = (game?.state as TicTacToeState) ?? null;
@@ -388,9 +388,6 @@ export default function GamePage() {
               ? "Word Scramble"
               : "Tic Tac Toe";
 
-  // Record the streak exactly once when a game completes — the ref guards
-  // against the reactive query re-delivering the same terminal state, while
-  // registerPlay() itself is idempotent within a local day.
   useEffect(() => {
     if (!isOver || status !== "completed") {
       streakRecordedRef.current = false;
@@ -401,11 +398,6 @@ export default function GamePage() {
     registerPlay();
   }, [isOver, status, registerPlay]);
 
-  // Keep the tab title + OG tags fresh for link previews (WhatsApp, Instagram,
-  // browsers re-sharing the link, etc.). Template 1 (the game invite card):
-  // status-aware title, the shared challenge description, and this game's
-  // board thumbnail. Crawlers that don't run JS get the static defaults from
-  // index.html (Template 2 on the root, or the head script's swap).
   useEffect(() => {
     const title = gameOgTitle(
       status,
@@ -434,23 +426,38 @@ export default function GamePage() {
       },
       shareUrl,
     );
-  }, [status, isRps, isRedBlack, isPong, isTwentyQuestions, isHangman, isWordScramble, state, rpsState, rbState, pongState, tqState, hangmanState, scrambleState, myMarker, gameLabel, gameType, shareUrl]);
+  }, [
+    status,
+    isRps,
+    isRedBlack,
+    isPong,
+    isTwentyQuestions,
+    isHangman,
+    isWordScramble,
+    state,
+    rpsState,
+    rbState,
+    pongState,
+    tqState,
+    hangmanState,
+    scrambleState,
+    myMarker,
+    gameLabel,
+    gameType,
+    shareUrl,
+  ]);
 
-  // Clear transient move errors after a moment.
   useEffect(() => {
     if (!moveError) return;
     const t = setTimeout(() => setMoveError(null), 3000);
     return () => clearTimeout(t);
   }, [moveError]);
 
-  // -------------------------------------------------------------------------
-  // Actions
-  // -------------------------------------------------------------------------
-
   const handleMove = async (cell: number) => {
     if (!state || isOver) return;
     try {
       await submitMove({ slug, deviceToken, cell });
+      await refreshGame();
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That move didn't go through.");
     }
@@ -459,6 +466,7 @@ export default function GamePage() {
   const handlePick = async (pick: RpsChoice): Promise<boolean> => {
     try {
       await submitMove({ slug, deviceToken, pick });
+      await refreshGame();
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That pick didn't go through.");
@@ -469,6 +477,7 @@ export default function GamePage() {
   const handleGuess = async (guess: RedBlackChoice): Promise<boolean> => {
     try {
       await submitMove({ slug, deviceToken, pick: guess });
+      await refreshGame();
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That guess didn't go through.");
@@ -476,9 +485,13 @@ export default function GamePage() {
     }
   };
 
-  const handleShot = async (angle: number, power: PongPower): Promise<boolean> => {
+  const handleShot = async (
+    angle: number,
+    power: PongPower,
+  ): Promise<boolean> => {
     try {
       await submitMove({ slug, deviceToken, angle, power });
+      await refreshGame();
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That shot didn't go through.");
@@ -489,6 +502,7 @@ export default function GamePage() {
   const handleTqMove = async (move: TwentyQuestionsMove): Promise<boolean> => {
     try {
       await submitMove({ slug, deviceToken, ...move });
+      await refreshGame();
       return true;
     } catch (err) {
       setMoveError(getApiError(err).message ?? "That move didn't go through.");
@@ -496,8 +510,6 @@ export default function GamePage() {
     }
   };
 
-  // Hangman and Word Scramble moves are a subset of the Twenty Questions
-  // move shape ({ secret } | { guess }), so they share the same handler.
   const handleWordMove = async (
     move: HangmanMove | WordScrambleMove,
   ): Promise<boolean> => handleTqMove(move);
@@ -532,10 +544,6 @@ export default function GamePage() {
     }
   };
 
-  // -------------------------------------------------------------------------
-  // Screens
-  // -------------------------------------------------------------------------
-
   if (joinStatus === "joining") {
     return (
       <FullPageMessage
@@ -561,12 +569,12 @@ export default function GamePage() {
     );
   }
 
-  if (query.status === "error") {
+  if (loadError) {
     return (
       <FullPageMessage
         icon={<MessageCircle className="size-6" />}
         title="Can't get into this game"
-        body={getApiError(query.error).message}
+        body={loadError}
         action={
           <Button onClick={() => navigate("/")} className="rounded-full px-6">
             <Home className="size-4" />
@@ -586,10 +594,6 @@ export default function GamePage() {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Abandoned / expired
-  // -------------------------------------------------------------------------
-
   if (status === "abandoned") {
     return (
       <FullPageMessage
@@ -605,10 +609,6 @@ export default function GamePage() {
       />
     );
   }
-
-  // -------------------------------------------------------------------------
-  // Waiting room (initiator sees the share card)
-  // -------------------------------------------------------------------------
 
   const isWaiting = status === "waiting";
 
@@ -662,14 +662,12 @@ export default function GamePage() {
         ? winner === myMarker
           ? "Silence never felt so good."
           : "The word is out — rematch?"
-      : draw
-        ? "A perfect standoff."
-        : state.winner === myMarker
-          ? "Silence never felt so good."
-          : "Rematch? The board is waiting.";
+        : draw
+          ? "A perfect standoff."
+          : state.winner === myMarker
+            ? "Silence never felt so good."
+            : "Rematch? The board is waiting.";
 
-  // If the opponent started a rematch, offer to follow them; otherwise the
-  // usual Play Again button (which also covers rematches I started myself).
   const rematch = matchGame
     ? isRps
       ? rpsState?.rematch
@@ -700,10 +698,8 @@ export default function GamePage() {
       </header>
 
       <main className="mx-auto w-full max-w-md px-5 pb-16">
-        {/* Share card */}
         {isWaiting && (
           <div className="relative mt-6 overflow-hidden rounded-3xl border border-primary/30 bg-card p-5 shadow-soft">
-            {/* Amber gradient hairline across the top */}
             <div
               aria-hidden
               className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0"
@@ -777,14 +773,12 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* Move error */}
         {moveError && (
           <p className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-center text-xs font-semibold text-destructive">
             {moveError}
           </p>
         )}
 
-        {/* Play area */}
         <div className="mt-6">
           {isRps ? (
             <RpsPlay
@@ -839,17 +833,17 @@ export default function GamePage() {
           )}
         </div>
 
-        {/* Result screen: Play Again + inline feedback */}
         {isOver && status === "completed" && (
           <div className="relative mt-8 overflow-hidden rounded-3xl border border-primary/25 bg-card p-6 text-center shadow-lift">
             <div
               aria-hidden
               className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0"
             />
-            <h2 className="font-display text-2xl font-black tracking-tight">{resultTitle}</h2>
+            <h2 className="font-display text-2xl font-black tracking-tight">
+              {resultTitle}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">{resultSubtitle}</p>
 
-            {/* Habit banner — a gentle nudge, only after a finished game */}
             {streak > 0 && (
               <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-2.5 shadow-chip">
                 <Flame className="size-4 shrink-0 text-primary" />
@@ -861,7 +855,6 @@ export default function GamePage() {
               </div>
             )}
 
-            {/* Rematch offer from the opponent, else Play Again */}
             {rematch && rematch.by !== deviceToken ? (
               <Button
                 className="mt-5 w-full rounded-full py-6 text-base font-bold transition-transform hover:-translate-y-0.5 active:translate-y-0"
@@ -885,7 +878,6 @@ export default function GamePage() {
               </Button>
             )}
 
-            {/* Inline feedback — one question, right on the result screen */}
             <div className="mt-6 border-t border-border pt-5">
               <p className="text-sm font-bold">Would you play again?</p>
               {feedbackSent === null ? (
@@ -914,7 +906,6 @@ export default function GamePage() {
               )}
             </div>
 
-            {/* Subtle A2HS prompt — only after a finished game, never on load */}
             <InstallPromptModal
               renderTrigger={(open) => (
                 <button
@@ -930,7 +921,6 @@ export default function GamePage() {
         )}
       </main>
 
-      {/* Floating video overlay — draggable, resizable, PiP-capable */}
       <FloatingVideo />
     </div>
   );
