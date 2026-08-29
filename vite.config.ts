@@ -9,10 +9,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "convex/react": path.resolve(__dirname, "./src/shims/convex-react.ts"),
-      "convex/values": path.resolve(__dirname, "./src/shims/convex-values.ts"),
-      "convex/server": path.resolve(__dirname, "./src/shims/convex-server.ts"),
-      "@/convex/_generated/api": path.resolve(__dirname, "./src/shims/api.ts"),
     },
     dedupe: ["react", "react/jsx-runtime", "react-dom", "react-dom/client"],
   },

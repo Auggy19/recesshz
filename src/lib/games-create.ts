@@ -21,7 +21,7 @@ import {
   type TwentyQuestionsState,
   type HangmanState,
   type WordScrambleState,
-} from "@/convex/gameLogic";
+} from "@/lib/gameLogic";
 
 export const EXPIRY_MS = 48 * 60 * 60 * 1000;
 const ROOM_RE = /^[A-Za-z0-9_-]{3,64}$/;
