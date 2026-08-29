@@ -1,2 +1,0 @@
-/** Convex auth removed. */
-export {};
