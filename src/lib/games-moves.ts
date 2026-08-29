@@ -16,8 +16,8 @@ import {
   type Marker as LogicMarker, type RpsChoice, type RedBlackChoice, type PongPower,
   type RpsState, type RedBlackState, type PongState, type TwentyQuestionsState,
   type HangmanState, type WordScrambleState, type YesNo,
-} from "@/convex/gameLogic";
-import type { TicTacToeState } from "@/convex/schema";
+  type TicTacToeState,
+} from "@/lib/gameLogic";
 
 const HANGMAN_RE = /^[A-Za-z][A-Za-z\s'-]*$/;
 const SCRAMBLE_RE = /^[A-Za-z]{3,12}$/;
