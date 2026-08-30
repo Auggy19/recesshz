@@ -1,6 +1,7 @@
 /**
  * Perfect Negotiation peer (Jan-Ivar / W3C pattern).
  * Handles offer glare when both sides call createOffer.
+ * Game DataChannel: ordered:false, maxRetransmits:0 (latest-wins inputs).
  * @see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
  */
 import type {
@@ -8,6 +9,7 @@ import type {
   PerfectNegotiationOptions,
   SignalMessage,
 } from "@/lib/live/types";
+import { LIVE_CHANNEL_INIT, LIVE_CHANNEL_LABEL } from "@/lib/live/wire";
 
 const DEFAULT_ICE: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -59,7 +61,7 @@ export class PerfectNegotiationPeer {
     this.send = opts.send;
     this.onDataChannel = opts.onDataChannel;
     this.onConnectionState = opts.onConnectionState;
-    this.dataChannelLabel = opts.dataChannelLabel ?? "game";
+    this.dataChannelLabel = opts.dataChannelLabel ?? LIVE_CHANNEL_LABEL;
 
     this.pc = new RTCPeerConnection({
       iceServers: opts.iceServers?.length ? opts.iceServers : DEFAULT_ICE,
@@ -85,15 +87,17 @@ export class PerfectNegotiationPeer {
       this.wireChannel(ev.channel);
     };
 
-    // Perfect negotiation: renegotiate whenever the stack needs it.
     this.pc.onnegotiationneeded = () => {
       void this.onNegotiationNeeded();
     };
   }
 
-  /** Create the outbound game channel (usually the impolite / offering side). */
+  /**
+   * Create the outbound "game" channel.
+   * SCTP: unordered + maxRetransmits 0 — low latency; app uses seq/latest-wins.
+   */
   createDataChannel(label = this.dataChannelLabel): RTCDataChannel {
-    const ch = this.pc.createDataChannel(label, { ordered: true });
+    const ch = this.pc.createDataChannel(label, { ...LIVE_CHANNEL_INIT });
     this.localDataChannel = ch;
     this.wireChannel(ch);
     return ch;
@@ -103,18 +107,15 @@ export class PerfectNegotiationPeer {
     return this.localDataChannel;
   }
 
-  /** Answerer adopts the offerer's session id after live-hello / first SDP. */
   adoptSessionId(id: string): void {
     if (id && id !== this._sessionId) {
       this._sessionId = id;
     }
   }
 
-  /** Feed inbound signaling messages from Supabase Broadcast. */
   async handleSignal(msg: SignalMessage): Promise<void> {
     if (this.closed) return;
     if (msg.from === this.localPeerId) return;
-    // Drop messages from a previous live attempt once we have a locked session.
     if (
       msg.sessionId !== this.sessionId &&
       msg.type !== "sdp-offer" &&
@@ -144,7 +145,6 @@ export class PerfectNegotiationPeer {
     }
   }
 
-  /** Kick off negotiation by ensuring a local data channel exists (triggers negotiationneeded). */
   startAsOfferer(): void {
     if (!this.localDataChannel) {
       this.createDataChannel();
@@ -181,8 +181,6 @@ export class PerfectNegotiationPeer {
     }
   }
 
-  // --- Perfect Negotiation internals ---------------------------------------
-
   private async onNegotiationNeeded(): Promise<void> {
     if (this.closed) return;
     try {
@@ -212,15 +210,11 @@ export class PerfectNegotiationPeer {
       this.isSettingRemoteAnswerPending;
 
     this.ignoreOffer = !this.polite && offerCollision;
-    if (this.ignoreOffer) {
-      // Impolite peer keeps its own offer; remote offer is ignored.
-      return;
-    }
+    if (this.ignoreOffer) return;
 
     this.onConnectionState?.("signaling");
 
     if (offerCollision) {
-      // Polite peer: roll back local offer, then accept remote.
       await Promise.all([
         this.pc.setLocalDescription({ type: "rollback" }),
         this.pc.setRemoteDescription({ type: "offer", sdp }),
@@ -254,7 +248,6 @@ export class PerfectNegotiationPeer {
     try {
       await this.pc.addIceCandidate(candidate);
     } catch (err) {
-      // Candidate may arrive before remote description; ignore if we intentionally dropped an offer.
       if (!this.ignoreOffer) {
         console.warn("[Recess live] addIceCandidate failed", err);
       }
@@ -270,7 +263,6 @@ export class PerfectNegotiationPeer {
   }
 }
 
-/** Derive polite peer: O is polite, or lower peerId if markers match. */
 export function isPolitePeer(
   localMarker: "X" | "O",
   localPeerId: string,
@@ -287,7 +279,6 @@ export function createSessionId(): string {
 }
 
 export function createPeerId(deviceToken: string): string {
-  // Short stable-ish id for this tab (not a security boundary).
   const suffix = Math.random().toString(36).slice(2, 8);
   const head = deviceToken.slice(0, 8);
   return `${head}-${suffix}`;
