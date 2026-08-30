@@ -1,0 +1,6 @@
+# Recess — Supabase local/remote config (Edge Functions)
+# Deploy: supabase functions deploy games --no-verify-jwt
+# (device_token auth is application-level; anon key still required by gateway)
+
+[functions.games]
+verify_jwt = false
