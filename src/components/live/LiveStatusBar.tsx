@@ -1,3 +1,4 @@
+import { PhoneOff, Radio } from "lucide-react";
 import type { LiveConnectionState } from "@/lib/live/types";
 
 type Props = {
@@ -21,7 +22,7 @@ const STATE_COPY: Record<string, string> = {
 
 /**
  * Live mode status + actions.
- * Icons: pulse dot (live), radio waves (Go live), hangup (End live).
+ * Modern lucide icons: Radio (Go live), PhoneOff (End live), pulse dot.
  */
 export function LiveStatusBar({
   connectionState,
@@ -89,17 +90,9 @@ export function LiveStatusBar({
             <button
               type="button"
               onClick={onGoLive}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm active:scale-[0.98] transition-transform"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M4.93 19.07a10 10 0 0 1 0-14.14M7.76 16.24a6 6 0 0 1 0-8.48M10.59 13.41a2 2 0 0 1 0-2.82"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-              </svg>
+              <Radio className="size-3.5" strokeWidth={2.5} aria-hidden />
               Go live
             </button>
           )
@@ -108,16 +101,9 @@ export function LiveStatusBar({
             <button
               type="button"
               onClick={onHangup}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground active:scale-[0.98] transition-transform"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M6 6l12 12M8 16a11 11 0 0 1 3-7l2 2"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <PhoneOff className="size-3.5" strokeWidth={2.5} aria-hidden />
               End live
             </button>
           )
