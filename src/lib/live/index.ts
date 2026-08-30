@@ -23,3 +23,4 @@ export { GameDataChannel, wrapGameDataChannel } from "@/lib/live/data-channel";
 export type { GameDataChannelHandlers } from "@/lib/live/data-channel";
 export { useLiveGame } from "@/lib/live/useLiveGame";
 export type { UseLiveGameOptions, UseLiveGameResult } from "@/lib/live/useLiveGame";
+export { resolveIceServers, DEFAULT_STUN } from "@/lib/live/ice";

@@ -6,29 +6,37 @@
 |-------|--------|
 | Perfect Negotiation | Done |
 | Supabase Realtime signaling | Done |
-| `game` DataChannel `ordered: false`, `maxRetransmits: 0` | Done |
-| Wire protocol + `GameDataChannel` | Done |
-| `useLiveGame` hook | Done |
-| `LiveStatusBar` UI | Done |
-| **GamePage wiring (both players connected)** | **Done (Phase 2)** |
-| Live Pong input loop | Phase 3 |
-| TURN credentials from Edge | Phase 3 |
+| `game` DataChannel unordered / maxRetransmits 0 | Done |
+| `useLiveGame` + LiveStatusBar | Done |
+| GamePage when both players connected | Done |
+| **Live Pong aim preview** | **Done (Phase 3)** |
+| **ICE / TURN resolution** | **Done (Phase 3)** |
+| **Edge `finalizeLiveMatch`** | **Done (Phase 3)** |
 
-## Phase 2 behavior
+## Phase 3 details
 
-On `GamePage`, when `status` is `in_progress` or `completed` and the player has a marker:
+### Pong live preview
+- While the data channel is open, local aim changes are sent as `input` messages (~20 Hz).
+- Axis = `angle / 60` in `[-1, 1]`.
+- Peer shows an emerald ghost paddle at `remoteAxis * 60` degrees.
+- Async `submitMove` remains the source of truth for scores.
 
-1. `useLiveGame({ enabled: true, ... })` is active.
-2. `LiveStatusBar` renders above the board (not while `waiting` for a friend).
-3. **Go live** starts Perfect Negotiation + unordered `game` DataChannel.
-4. **End live** hangs up and tears down the session.
+### TURN / ICE
+- Client calls `resolveIceServers()` → Edge action `getIceServers`.
+- Edge always returns Google STUN; adds TURN when secrets are set:
+  - `TURN_URLS` (comma-separated)
+  - `TURN_USERNAME` / `TURN_CREDENTIAL`
+- Client fallback: `VITE_TURN_*` + default STUN.
 
-Async Edge moves remain the source of truth for scores.
+### Finalize scores / session
+- Edge action `finalizeLiveMatch`:
+  - `reason: "forfeit"` + `in_progress` → opponent wins, `status: completed`.
+  - `reason: "disconnect" | "complete"` → attaches `state.liveEnd` metadata.
+- **End live** on the status bar records a disconnect finalize then hangs up.
 
-## File map
+## Deploy notes
 
-```
-src/lib/live/          transport + hook
-src/components/live/   LiveStatusBar
-src/pages/GamePage.tsx mounts bar when both players are in
+```bash
+supabase secrets set TURN_URLS="turn:..." TURN_USERNAME="..." TURN_CREDENTIAL="..."
+supabase functions deploy games --no-verify-jwt
 ```

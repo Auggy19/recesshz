@@ -11,5 +11,7 @@ export {
   playAgain,
   submitFeedback,
   subscribeGame,
+  getIceServers,
+  finalizeLiveMatch,
 } from "@/lib/games-edge";
 export type { SubmitMoveArgs } from "@/lib/games-edge";
