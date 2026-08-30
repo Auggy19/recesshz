@@ -34,6 +34,12 @@ import {
   TwentyQuestionsArt,
   WordScrambleArt,
 } from "@/components/GameArt";
+import { GameIcon, GameChip } from "@/components/GameIcon";
+import {
+  AVAILABLE_GAMES,
+  urlGameToType,
+  type SupportedGameType,
+} from "@/lib/gameCatalog";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -46,41 +52,15 @@ interface GameCard {
   art: React.ReactNode;
 }
 
-/** Map friendly URL game names (?game=...) to the server game type. */
-function urlGameToType(raw: string | null): string | null {
-  switch (raw) {
-    case "tic-tac-toe":
-    case "tic_tac_toe":
-    case "ttt":
-      return "tic_tac_toe";
-    case "rock-paper-scissors":
-    case "rock_paper_scissors":
-    case "rps":
-      return "rock_paper_scissors";
-    case "red-or-black":
-    case "red_or_black":
-    case "redblack":
-    case "rnb":
-      return "red_or_black";
-    case "pong":
-    case "ping-pong":
-    case "ping_pong":
-      return "pong";
-    case "twenty-questions":
-    case "twenty_questions":
-    case "20-questions":
-    case "tq":
-      return "twenty_questions";
-    case "hangman":
-      return "hangman";
-    case "word-scramble":
-    case "word_scramble":
-    case "scramble":
-      return "word_scramble";
-    default:
-      return null;
-  }
-}
+const GAME_ART: Record<string, React.ReactNode> = {
+  tic_tac_toe: <TicTacToeArt className="w-28 sm:w-36" />,
+  rock_paper_scissors: <RockPaperScissorsArt className="w-28 sm:w-36" />,
+  red_or_black: <RedOrBlackArt className="w-28 sm:w-36" />,
+  pong: <PongArt className="w-28 sm:w-36" />,
+  hangman: <HangmanArt className="w-28 sm:w-36" />,
+  word_scramble: <WordScrambleArt className="w-28 sm:w-36" />,
+  twenty_questions: <TwentyQuestionsArt className="w-28 sm:w-36" />,
+};
 
 const upcomingGames: GameCard[] = [
   {
@@ -96,10 +76,9 @@ export default function Landing() {
   const { streak } = useStreak();
   const [creating, setCreating] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
-  const [roomGame, setRoomGame] = useState<string>("tic_tac_toe");
+  const [roomGame, setRoomGame] = useState<SupportedGameType>("tic_tac_toe");
   const roomJoinedRef = useRef(false);
 
-  /** Create-or-join a game; with a room slug both players share one link. */
   const handleCreateGame = async (gameType: string, roomSlug?: string) => {
     if (creating) return;
     setCreating(gameType);
@@ -127,12 +106,10 @@ export default function Landing() {
     void handleCreateGame(roomGame, code);
   };
 
-  // Open Graph: keep SPA re-renders + re-shares correct.
   useEffect(() => {
     applyOgMeta(resolveOgMeta(window.location.search));
   }, []);
 
-  // Instant room: /?room=XYZ&game=tic-tac-toe joins or creates that room.
   useEffect(() => {
     if (roomJoinedRef.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -159,7 +136,6 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Top bar */}
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5">
         <Wordmark size="md" />
         <div className="flex items-center gap-3">
@@ -179,7 +155,6 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero */}
       <section className="relative mx-auto w-full max-w-5xl px-5 pb-16 pt-10 text-center sm:pt-16">
         <div
           aria-hidden
@@ -230,7 +205,7 @@ export default function Landing() {
           className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
         >
           Start a game, drop the link in any chat, and your friend plays when
-          they're ready. No accounts. No downloads. No pressure.
+          they&apos;re ready. No accounts. No downloads. No pressure.
         </motion.p>
 
         <motion.div
@@ -284,102 +259,55 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* Games */}
       <section id="games" className="mx-auto w-full max-w-5xl px-5 pb-16">
         <motion.div
           {...fadeUp}
           transition={{ duration: 0.4 }}
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
-          {(
-            [
-              {
-                type: "tic_tac_toe",
-                name: "Tic Tac Toe",
-                blurb:
-                  "Three in a row. Pass the link, make a move, and come back when it's your turn — your board waits for you.",
-                art: <TicTacToeArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "rock_paper_scissors",
-                name: "Rock Paper Scissors",
-                blurb:
-                  "Best of three. Both of you pick in secret, and the picks only reveal once they're both in — no peeking, no arguing.",
-                art: <RockPaperScissorsArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "red_or_black",
-                name: "Red or Black",
-                blurb:
-                  "Your friend picks a color, the server deals the card, and the reveal lands in an instant. Best of three — guess right to take a round.",
-                art: <RedOrBlackArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "pong",
-                name: "Pong",
-                blurb:
-                  "Classic paddle tennis, by message. Serve an angle, read the return, and chase the rally — first to 7 points takes it.",
-                art: <PongArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "hangman",
-                name: "Hangman",
-                blurb:
-                  "One of you sets a word, the other guesses letters until the figure hangs — or the word is found. Six wrong guesses.",
-                art: <HangmanArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "word_scramble",
-                name: "Word Scramble",
-                blurb:
-                  "One of you picks a word, the server scrambles it, and the other has three attempts to unscramble it. No peeking, ever.",
-                art: <WordScrambleArt className="w-28 sm:w-36" />,
-              },
-              {
-                type: "twenty_questions",
-                name: "Twenty Questions",
-                blurb:
-                  "One of you thinks of something, the other asks yes/no questions until the guess lands — or the 20 questions run out.",
-                art: <TwentyQuestionsArt className="w-28 sm:w-36" />,
-              },
-            ] as const
-          ).map((game) => (
-            <button
-              key={game.type}
-              type="button"
-              onClick={() => handleCreateGame(game.type)}
-              disabled={creating !== null}
-              className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
-            >
-              <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-                Ready to play
-              </div>
-              <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
-                {game.art}
-              </div>
-              <div>
-                <h3 className="text-2xl font-black tracking-tight">{game.name}</h3>
-                <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                  {game.blurb}
-                </p>
-              </div>
-              <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
-                {creating === game.type ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Link2 className="size-4" />
-                )}
-                Create game
-              </span>
-            </button>
-          ))}
+          {AVAILABLE_GAMES.map((g) => {
+            const art = GAME_ART[g.type] ?? null;
+            return (
+              <button
+                key={g.type}
+                type="button"
+                onClick={() => handleCreateGame(g.type)}
+                disabled={creating !== null}
+                className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
+              >
+                <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
+                  Ready to play
+                </div>
+                <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip dark:bg-amber-950/30">
+                  {art}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <GameIcon gameType={g.type} size="sm" />
+                    <h3 className="text-2xl font-black tracking-tight">{g.name}</h3>
+                  </div>
+                  <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                    {g.blurb}
+                  </p>
+                </div>
+                <span className="mt-1 inline-flex items-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all group-hover:translate-x-0.5 group-hover:brightness-105">
+                  {creating === g.type ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Link2 className="size-4" />
+                  )}
+                  Create game
+                </span>
+              </button>
+            );
+          })}
 
           {upcomingGames.map((game) => (
             <div
               key={game.name}
               className="col-span-2 flex flex-col gap-4 rounded-3xl border border-dashed border-border bg-card/60 p-6 opacity-80 shadow-soft transition-all hover:-translate-y-0.5 hover:opacity-100"
             >
-              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip">
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip dark:bg-amber-950/30">
                 {game.art}
               </div>
               <div>
@@ -398,7 +326,6 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* Open a room by code */}
       <section className="mx-auto w-full max-w-5xl px-5 pb-16">
         <motion.div
           {...fadeUp}
@@ -427,29 +354,14 @@ export default function Landing() {
               className="h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-chip outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-background p-1 shadow-chip">
-              {(
-                [
-                  ["tic_tac_toe", "Tic Tac Toe"],
-                  ["rock_paper_scissors", "RPS"],
-                  ["red_or_black", "Red/Black"],
-                  ["pong", "Pong"],
-                  ["twenty_questions", "20 Qs"],
-                  ["hangman", "Hangman"],
-                  ["word_scramble", "Scramble"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setRoomGame(value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-                    roomGame === value
-                      ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
+              {AVAILABLE_GAMES.map((g) => (
+                <GameChip
+                  key={g.type}
+                  gameType={g.type}
+                  selected={roomGame === g.type}
+                  onClick={() => setRoomGame(g.type)}
+                  disabled={creating !== null}
+                />
               ))}
             </div>
             <button
@@ -468,7 +380,6 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* Brand mood */}
       <section className="mx-auto w-full max-w-5xl px-5 pb-16">
         <motion.div
           {...fadeUp}
@@ -509,7 +420,6 @@ export default function Landing() {
         </motion.div>
       </section>
 
-      {/* How it works */}
       <section id="how-it-works" className="border-y border-border bg-card/50">
         <div className="mx-auto w-full max-w-5xl px-5 py-16">
           <motion.div {...fadeUp} transition={{ duration: 0.4 }}>
