@@ -3,14 +3,6 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Loader2 } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// Pong — vertical correspondence paddle tennis (mobile-first).
-//
-// Court is portrait: paddles at TOP (X) and BOTTOM (O). Ball travels up/down.
-// Angle controls left ↔ right deviation. Soft/Medium/Hard power still tunes
-// the return window (kept generous). First to 7 wins.
-// ---------------------------------------------------------------------------
-
 type Marker = "X" | "O";
 type GameStatus = "waiting" | "in_progress" | "completed" | "abandoned";
 export type PongPower = 1 | 2 | 3;
@@ -40,6 +32,9 @@ interface Props {
   status: GameStatus;
   myMarker: Marker;
   onShot: (angle: number, power: PongPower) => Promise<boolean>;
+  remoteAim?: number | null;
+  onAimChange?: (angle: number) => void;
+  liveConnected?: boolean;
 }
 
 const PONG_TARGET = 7;
@@ -61,16 +56,10 @@ const POWER_LABELS: Record<PongPower, string> = {
 const clamp = (v: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, v));
 
-/** Angle → horizontal position on the vertical court (percent 0–100). */
 const posX = (angle: number) => clamp(50 + angle * 0.55, 8, 92);
-
-/** Vertical side: X plays TOP, O plays BOTTOM. */
 const sideY = (m: Marker) => (m === "X" ? 8 : 88);
-
 const signed = (a: number) => `${a > 0 ? "+" : ""}${a}`;
-
 const other = (m: Marker): Marker => (m === "X" ? "O" : "X");
-
 const COURT_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 function snapAngle(a: number, min: number, max: number) {
@@ -78,10 +67,22 @@ function snapAngle(a: number, min: number, max: number) {
   return clamp(stepped, min, max);
 }
 
-export default function PongPlay({ state, status, myMarker, onShot }: Props) {
+export default function PongPlay({
+  state,
+  status,
+  myMarker,
+  onShot,
+  remoteAim = null,
+  onAimChange,
+  liveConnected = false,
+}: Props) {
   const [angle, setAngle] = useState(0);
   const [power, setPower] = useState<PongPower>(1);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    onAimChange?.(angle);
+  }, [angle, onAimChange]);
 
   const isWaiting = status === "waiting";
   const isMatchOver = state.matchWinner !== null;
@@ -91,13 +92,10 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
   const inFlight = state.phase === "return" && serve !== null;
   const resolved = state.phase === "point_over" || state.phase === "match_over";
 
-  // --- Vertical court geometry ---------------------------------------------
-  // Ball travels TOP ↔ BOTTOM. Angle controls LEFT ↔ RIGHT.
   let ballX: number;
   let ballY: number;
 
   if (inFlight && serve) {
-    // Ball has arrived at the returner's end, offset by serve angle
     ballY = sideY(state.turn);
     ballX = posX(serve.angle);
   } else if (state.phase === "match_over" && last) {
@@ -105,15 +103,12 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
     ballY = sideY(returner);
     ballX = last.good ? posX(-last.ret.angle) : posX(last.serve.angle);
   } else {
-    // Parked with the next server, centered
     ballY = sideY(state.turn);
     ballX = 50;
   }
 
-  // Paddle horizontal position (they slide left/right)
   const paddleX = (m: Marker): number => {
     if (inFlight && serve) {
-      // Server's paddle stays at launch spot; returner's is neutral until they swing
       return m === other(state.turn) ? posX(serve.angle) : 50;
     }
     if (state.phase === "match_over" && last) {
@@ -136,7 +131,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
   const angleMax = isMyServe ? SERVE_ANGLE_MAX : RETURN_ANGLE_MAX;
   const myTurn = isMyServe || isMyReturn;
 
-  // Auto-aim the ideal mirror on return turns
   useEffect(() => {
     if (isMyReturn && serve) {
       const ideal = snapAngle(-serve.angle, -RETURN_ANGLE_MAX, RETURN_ANGLE_MAX);
@@ -156,7 +150,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
       ? snapAngle(-serve.angle, -RETURN_ANGLE_MAX, RETURN_ANGLE_MAX)
       : null;
 
-  // Live preview of where the player's paddle will be
   const previewX = myTurn ? posX(angle) : null;
 
   let statusText: string;
@@ -193,7 +186,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
 
   return (
     <>
-      {/* Status */}
       <div className="flex items-center justify-center gap-2 text-center px-2">
         <span
           className={cn(
@@ -206,7 +198,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
         <p className="text-sm font-semibold text-muted-foreground">{statusText}</p>
       </div>
 
-      {/* Score */}
       <div className="mx-auto mt-4 flex w-full max-w-[280px] items-center justify-between rounded-2xl border border-border bg-card px-4 py-2.5 shadow-soft">
         <span
           className={cn(
@@ -229,7 +220,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
         </span>
       </div>
 
-      {/* ========== VERTICAL COURT ========== */}
       <div
         className={cn(
           "relative mx-auto mt-4 w-full max-w-[240px] overflow-hidden rounded-3xl border-2 border-[#1A1A1A] bg-[#FFF9E5] shadow-lift ring-1 ring-black/5",
@@ -237,10 +227,8 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
         )}
         style={{ aspectRatio: "4 / 7" }}
       >
-        {/* Center dashed line (horizontal now) */}
         <div className="absolute inset-x-[8%] top-1/2 -translate-y-1/2 border-t-2 border-dashed border-[#1A1A1A]/25" />
 
-        {/* Top paddle (X) — slides left/right */}
         <div
           className="absolute top-[4%] h-[10px] w-[28%] rounded-full bg-[#1A1A1A] shadow-sm"
           style={{
@@ -249,7 +237,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
           }}
         />
 
-        {/* Bottom paddle (O) — slides left/right */}
         <div
           className="absolute bottom-[4%] h-[10px] w-[28%] rounded-full bg-[#1A1A1A] shadow-sm"
           style={{
@@ -258,21 +245,29 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
           }}
         />
 
-        {/* Live aim preview (ghost paddle) when it's your turn */}
         {myTurn && previewX !== null && (
           <div
             className="absolute h-[10px] w-[28%] rounded-full border-2 border-primary/60 bg-primary/20"
             style={{
               left: `calc(${previewX}% - 14%)`,
-              ...(myMarker === "X"
-                ? { top: "4%" }
-                : { bottom: "4%" }),
+              ...(myMarker === "X" ? { top: "4%" } : { bottom: "4%" }),
               transition: `left 120ms linear`,
             }}
           />
         )}
 
-        {/* Arrival marker when ball is in flight toward you */}
+        {liveConnected && remoteAim !== null && remoteAim !== undefined && (
+          <div
+            className="absolute h-[10px] w-[28%] rounded-full border-2 border-emerald-500/50 bg-emerald-500/15"
+            style={{
+              left: `calc(${posX(remoteAim)}% - 14%)`,
+              ...(opponent === "X" ? { top: "4%" } : { bottom: "4%" }),
+              transition: "left 80ms linear",
+            }}
+            title="Friend's live aim"
+          />
+        )}
+
         {inFlight && serve && state.turn === myMarker && (
           <div
             className="absolute h-[14px] w-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary/50 bg-primary/15"
@@ -283,7 +278,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
           />
         )}
 
-        {/* The ball */}
         <div
           className={cn(
             "absolute size-[16px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-[0_2px_12px_rgba(245,166,35,0.55)]",
@@ -301,7 +295,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
         />
       </div>
 
-      {/* Point reveal */}
       {resolved && last && (
         <div className="mx-auto mt-4 w-full max-w-[280px] rounded-3xl border border-primary/30 bg-card p-4 shadow-soft">
           <div className="flex items-center justify-between gap-3">
@@ -327,22 +320,11 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
               ? "Clean return — paddle found it."
               : "Missed the paddle that time."}
           </p>
-          {!isMatchOver && (
-            <p className="mt-1.5 text-center text-xs text-muted-foreground">
-              {state.turn === myMarker
-                ? "Your serve — go again."
-                : "Your friend serves next."}
-            </p>
-          )}
         </div>
       )}
 
-      {/* Controls */}
       {(isMyServe || isMyReturn) && (
-        <div
-          key={`${state.phase}-${state.turn}`}
-          className="mx-auto mt-4 w-full max-w-[280px]"
-        >
+        <div key={`${state.phase}-${state.turn}`} className="mx-auto mt-4 w-full max-w-[280px]">
           <div className="rounded-3xl border-2 border-border bg-card p-4 shadow-soft">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-muted-foreground">
@@ -359,7 +341,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
               </p>
             )}
 
-            {/* Horizontal slider = left ↔ right on the vertical court */}
             <Slider
               className="mt-3 [&_[data-slot=slider-thumb]]:size-6"
               min={angleMin}
@@ -397,9 +378,7 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
                   >
                     {o.label}
                   </span>
-                  <span className="text-[10px] font-semibold text-muted-foreground">
-                    {o.hint}
-                  </span>
+                  <span className="text-[10px] font-semibold text-muted-foreground">{o.hint}</span>
                 </button>
               ))}
             </div>
@@ -413,12 +392,6 @@ export default function PongPlay({ state, status, myMarker, onShot }: Props) {
               {submitting && <Loader2 className="size-4 animate-spin" />}
               {isMyServe ? "Serve" : "Return"}
             </button>
-
-            <p className="mt-2.5 text-center text-xs text-muted-foreground">
-              {isMyServe
-                ? "Slide to aim. Soft is easiest for your friend to return."
-                : "Aim is pre-set near the sweet spot. Soft = widest window."}
-            </p>
           </div>
         </div>
       )}
