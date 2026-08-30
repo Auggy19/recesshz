@@ -4,12 +4,12 @@ import type { LiveConnectionState } from "@/lib/live/types";
 import { GameDataChannel } from "@/lib/live/data-channel";
 import type { LiveWireV1 } from "@/lib/live/wire";
 import { LIVE_CHANNEL_LABEL } from "@/lib/live/wire";
+import { resolveIceServers } from "@/lib/live/ice";
 
 export type UseLiveGameOptions = {
   slug: string;
   deviceToken: string;
   marker: "X" | "O";
-  /** When true, prepares lifecycle; call start() to begin negotiation. */
   enabled: boolean;
   onRemoteMessage?: (msg: LiveWireV1) => void;
 };
@@ -19,15 +19,13 @@ export type UseLiveGameResult = {
   signalStatus: string | null;
   channelOpen: boolean;
   gameChannel: GameDataChannel | null;
+  remoteAxis: number | null;
   start: () => void;
   hangup: () => Promise<void>;
   sendInput: (axis: number) => boolean;
   sendEvent: (kind: "pause" | "resume" | "forfeit" | "ready") => boolean;
 };
 
-/**
- * React hook: live session + unordered/unreliable "game" DataChannel.
- */
 export function useLiveGame(opts: UseLiveGameOptions): UseLiveGameResult {
   const [connectionState, setConnectionState] = useState<
     LiveConnectionState | "idle"
@@ -35,50 +33,72 @@ export function useLiveGame(opts: UseLiveGameOptions): UseLiveGameResult {
   const [signalStatus, setSignalStatus] = useState<string | null>(null);
   const [channelOpen, setChannelOpen] = useState(false);
   const [gameChannel, setGameChannel] = useState<GameDataChannel | null>(null);
+  const [remoteAxis, setRemoteAxis] = useState<number | null>(null);
 
   const sessionRef = useRef<LiveSession | null>(null);
   const onRemoteRef = useRef(opts.onRemoteMessage);
   onRemoteRef.current = opts.onRemoteMessage;
+  const startingRef = useRef(false);
 
   const dispose = useCallback(() => {
     sessionRef.current?.dispose();
     sessionRef.current = null;
     setGameChannel(null);
     setChannelOpen(false);
+    setRemoteAxis(null);
     setConnectionState("idle");
+    startingRef.current = false;
   }, []);
 
   const start = useCallback(() => {
-    if (sessionRef.current) return;
+    if (sessionRef.current || startingRef.current) return;
     if (!opts.slug || !opts.deviceToken) return;
-
-    const session = createLiveSession({
-      slug: opts.slug,
-      deviceToken: opts.deviceToken,
-      marker: opts.marker,
-      onConnectionState: (s) => setConnectionState(s),
-      onSignalStatus: (s) => setSignalStatus(s),
-      onRemoteHangup: () => {
-        setConnectionState("closed");
-        setChannelOpen(false);
-      },
-      onDataChannel: (ch) => {
-        if (ch.label && ch.label !== LIVE_CHANNEL_LABEL) return;
-        const wrapped = new GameDataChannel(ch, {
-          onOpen: () => {
-            setChannelOpen(true);
-            wrapped.sendHello(opts.marker);
-          },
-          onClose: () => setChannelOpen(false),
-          onMessage: (msg) => onRemoteRef.current?.(msg),
-        });
-        setGameChannel(wrapped);
-      },
-    });
-
-    sessionRef.current = session;
+    startingRef.current = true;
     setConnectionState("signaling");
-    session.start();
+
+    void (async () => {
+      try {
+        const iceServers = await resolveIceServers();
+        if (sessionRef.current) return;
+
+        const session = createLiveSession({
+          slug: opts.slug,
+          deviceToken: opts.deviceToken,
+          marker: opts.marker,
+          iceServers,
+          onConnectionState: (s) => setConnectionState(s),
+          onSignalStatus: (s) => setSignalStatus(s),
+          onRemoteHangup: () => {
+            setConnectionState("closed");
+            setChannelOpen(false);
+          },
+          onDataChannel: (ch) => {
+            if (ch.label && ch.label !== LIVE_CHANNEL_LABEL) return;
+            const wrapped = new GameDataChannel(ch, {
+              onOpen: () => {
+                setChannelOpen(true);
+                wrapped.sendHello(opts.marker);
+              },
+              onClose: () => setChannelOpen(false),
+              onMessage: (msg) => {
+                if (msg.type === "input" && typeof msg.axis === "number") {
+                  setRemoteAxis(Math.max(-1, Math.min(1, msg.axis)));
+                }
+                onRemoteRef.current?.(msg);
+              },
+            });
+            setGameChannel(wrapped);
+          },
+        });
+
+        sessionRef.current = session;
+        session.start();
+      } catch (err) {
+        console.warn("[Recess live] start failed", err);
+        setConnectionState("failed");
+        startingRef.current = false;
+      }
+    })();
   }, [opts.slug, opts.deviceToken, opts.marker]);
 
   const hangup = useCallback(async () => {
@@ -110,6 +130,7 @@ export function useLiveGame(opts: UseLiveGameOptions): UseLiveGameResult {
     signalStatus,
     channelOpen,
     gameChannel,
+    remoteAxis,
     start,
     hangup,
     sendInput,
