@@ -87,6 +87,24 @@ export async function submitFeedback(args: {
   return invokeGames<{ ok: boolean }>("submitFeedback", args);
 }
 
+/** ICE servers for live WebRTC (STUN + optional TURN from Edge secrets). */
+export async function getIceServers() {
+  return invokeGames<{ iceServers: RTCIceServer[] }>("getIceServers", {});
+}
+
+/**
+ * Authoritative live match end: forfeit or agreed completion.
+ * Does not trust peer scores for ranked fairness beyond forfeit.
+ */
+export async function finalizeLiveMatch(args: {
+  slug: string;
+  deviceToken: string;
+  reason: "forfeit" | "complete" | "disconnect";
+  scores?: { X: number; O: number };
+}) {
+  return invokeGames<{ ok: boolean; status: string }>("finalizeLiveMatch", args);
+}
+
 /** Realtime stays on the client — no Edge Function needed. */
 export function subscribeGame(slug: string, onChange: () => void): () => void {
   if (!isSupabaseConfigured) return () => {};
