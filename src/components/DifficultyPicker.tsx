@@ -2,7 +2,7 @@ import {
   DIFFICULTY_HINTS,
   DIFFICULTY_LABELS,
   type Difficulty,
-} from "@/lib/singlePlayer";
+} from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 
 const ORDER: Difficulty[] = ["beginner", "intermediate", "expert"];
