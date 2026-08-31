@@ -1,6 +1,4 @@
-/**
- * Social / competition sharing helpers for Recess.
- */
+/** Competition-friendly social share helpers. */
 
 export type SharePayload = {
   title: string;
@@ -8,34 +6,39 @@ export type SharePayload = {
   url: string;
 };
 
-export function buildChallengeShare(opts: {
+export function buildMatchShare(opts: {
   gameName: string;
-  url: string;
-  result?: "win" | "loss" | "draw" | null;
+  result: "won" | "lost" | "drew" | "playing";
+  scoreLine?: string;
+  roomUrl: string;
 }): SharePayload {
-  const { gameName, url, result } = opts;
-  if (result === "win") {
-    return {
-      title: "Recess",
-      text: `I just won ${gameName} on Recess — your move? ${url}`,
-      url,
-    };
-  }
-  if (result === "loss") {
-    return {
-      title: "Recess",
-      text: `Tough match of ${gameName} on Recess. Rematch? ${url}`,
-      url,
-    };
-  }
+  const emoji =
+    opts.result === "won"
+      ? "🏆"
+      : opts.result === "lost"
+        ? "💪"
+        : opts.result === "drew"
+          ? "🤝"
+          : "🎮";
+  const verb =
+    opts.result === "won"
+      ? "I just won"
+      : opts.result === "lost"
+        ? "Close one in"
+        : opts.result === "drew"
+          ? "We drew in"
+          : "Playing";
+  const score = opts.scoreLine ? ` ${opts.scoreLine}` : "";
   return {
-    title: "Recess",
-    text: `You've been challenged to ${gameName} on Recess — play when you're free. ${url}`,
-    url,
+    title: `Recess — ${opts.gameName}`,
+    text: `${emoji} ${verb} ${opts.gameName} on Recess.${score} Your move?`,
+    url: opts.roomUrl,
   };
 }
 
-export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "copied" | "failed"> {
+export async function shareMatch(
+  payload: SharePayload,
+): Promise<"shared" | "copied" | "failed"> {
   try {
     if (typeof navigator !== "undefined" && navigator.share) {
       await navigator.share({
@@ -46,24 +49,19 @@ export async function shareOrCopy(payload: SharePayload): Promise<"shared" | "co
       return "shared";
     }
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") return "failed";
+    if (err instanceof Error && err.name === "AbortError") return "failed";
   }
   try {
-    await navigator.clipboard.writeText(`${payload.text}`);
+    await navigator.clipboard.writeText(`${payload.text}\n${payload.url}`);
     return "copied";
   } catch {
     return "failed";
   }
 }
 
-export function whatsAppShareHref(payload: SharePayload): string {
-  return `https://wa.me/?text=${encodeURIComponent(payload.text)}`;
-}
-
-export function twitterShareHref(payload: SharePayload): string {
-  const q = new URLSearchParams({
-    text: payload.text,
-    url: payload.url,
-  });
-  return `https://twitter.com/intent/tweet?${q.toString()}`;
+export function shareUrlForRoom(
+  slug: string,
+  origin = typeof window !== "undefined" ? window.location.origin : "",
+): string {
+  return `${origin}/play/${slug}`;
 }
