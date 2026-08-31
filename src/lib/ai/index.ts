@@ -10,7 +10,12 @@ import type { AiContext, AiMove } from "@/lib/ai/types";
 
 export type { Difficulty, AiContext, AiMove };
 export { chooseTicTacToeMove, chooseRpsPick, chooseRedBlackGuess, choosePongShot };
-export { useSinglePlayerTicTacToe } from "@/lib/ai/useSinglePlayer";
+export {
+  useSinglePlayerTicTacToe,
+  useSinglePlayerRps,
+  useSinglePlayerRedBlack,
+  useSinglePlayerPong,
+} from "@/lib/ai/useSinglePlayer";
 
 export function chooseAiMove(ctx: AiContext, difficulty: Difficulty): AiMove {
   switch (ctx.game) {
