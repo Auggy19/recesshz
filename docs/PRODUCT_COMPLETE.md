@@ -1,29 +1,39 @@
 # Recess — product completion architecture
 
 ## Visual system
-- Brand core: amber `#F5A623`, ink `#1A1A1A`, champagne cream.
-- Per-game accents in `gameCatalog` / `ACCENT_CLASSES` (premium deep gradients).
-- `GameIcon` + `GameChip` for cohesive Lucide marks.
+- Brand core: amber `#F5A623`, ink `#1A1A1A`, champagne cream `#FFF9E5`.
+- Tokens: `src/lib/design-tokens.ts` (palette, gradients, difficulty).
+- Per-game accents: `gameCatalog` / `ACCENT_CLASSES` (deep premium gradients).
+- Icons: `GameIcon` + `GameChip` (Lucide, cohesive tiles).
 
 ## Single-player
-- `src/lib/singlePlayer.ts` — beginner / intermediate / expert for Tic-Tac-Toe, RPS, Pong.
-- UI: `DifficultyPicker`, `SoloLaunch`
+- Games: Tic-Tac-Toe, RPS, Red or Black, Pong.
+- Difficulties: beginner / intermediate / expert.
+- Hooks: `src/lib/ai/useSinglePlayer.ts`
+- UI: `/solo/:gameType`, `DifficultyPicker`, `SoloLaunch`.
 
-## Live Pong
-- Authoritative scores: Edge `submitMove`
-- Real-time aim: WebRTC DataChannel (`ordered:false`, `maxRetransmits:0`) via `useLiveGame`
-- Signaling: Supabase Realtime Broadcast `live:${slug}`
+## Live Pong (real-time)
+- Authoritative scores: Edge `submitMove` / `finalizeLiveMatch`.
+- Real-time aim: WebRTC DataChannel `ordered:false`, `maxRetransmits:0`.
+- Signaling: Supabase Realtime Broadcast `live:${slug}`.
+- UI: `LiveStatusBar` + ghost paddle on `PongPlay`.
 
-## Tournaments
-- Tiers: free / plus / pro — `src/lib/tournaments.ts`
+## Tournaments (tiered access)
+- Tiers: `free` | `plus` | `pro` — `src/lib/tournaments/tiers.ts`.
+- Free: open casual rooms. Plus: ranked brackets. Pro: private events + ad suppression.
+- UI: `TournamentCard` on dashboard / lobby.
 
-## Celebrations
-- Web Audio cues; mute + reduced motion respected
-- `CelebrationOverlay`
+## Celebrations + adaptive sound
+- Web Audio cues (`win` / `loss` / `draw` / `point` / `live`).
+- Respects mute preference + `prefers-reduced-motion`.
+- `CelebrationOverlay` + `src/lib/celebration.ts`.
 
 ## Social sharing
-- `src/lib/share.ts`
+- `buildMatchShare` + `shareMatch` (Web Share API → clipboard fallback).
+- Use post-match on GamePage / Solo.
 
-## Ads
+## Ads (non-intrusive)
 - `VITE_AD_NETWORK=none|house|adsense|gam|custom`
-- Pro suppresses most slots; never mid-move interstitials
+- Placements: landing_footer, post_match, tournament_lobby (never mid-move).
+- Relevance keywords by game type; Pro tier suppresses surface ads.
+- `AdSlot` + `src/lib/ads/adNetwork.ts`.
