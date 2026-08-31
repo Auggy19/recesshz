@@ -1,6 +1,5 @@
 /**
- * Cohesive Lucide-based game icons for Recess.
- * Use on Landing cards, room chips, and in-game headers.
+ * Premium Lucide game icons — cohesive tiles for Recess.
  */
 import {
   CircleHelp,
@@ -46,7 +45,6 @@ export type GameIconProps = {
   icon?: GameIconId;
   accent?: GameAccent;
   size?: Size;
-  /** Filled gradient tile (default) or soft tint */
   variant?: "solid" | "soft" | "ghost";
   className?: string;
   title?: string;
@@ -73,7 +71,7 @@ export function GameIcon({
       title={title ?? entry?.name}
       aria-hidden={!title}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center",
+        "inline-flex shrink-0 items-center justify-center ring-1 ring-black/5 dark:ring-white/10",
         s.box,
         variant === "solid" &&
           `bg-gradient-to-b ${a.tile} text-white shadow-sm`,
@@ -82,12 +80,11 @@ export function GameIcon({
         className,
       )}
     >
-      <Icon className={s.icon} strokeWidth={2.25} />
+      <Icon className={s.icon} strokeWidth={2.15} />
     </span>
   );
 }
 
-/** Room-picker chip with icon + short label. */
 export function GameChip({
   gameType,
   selected,
@@ -110,7 +107,7 @@ export function GameChip({
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all",
         selected
           ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
       )}
     >
       <GameIcon
@@ -118,7 +115,8 @@ export function GameChip({
         size="sm"
         variant={selected ? "ghost" : "soft"}
         className={cn(
-          selected && "!bg-transparent !text-white !shadow-none size-5 rounded-md",
+          selected &&
+            "!size-5 !rounded-md !bg-transparent !text-white !shadow-none !ring-0",
         )}
       />
       {entry.shortName}
