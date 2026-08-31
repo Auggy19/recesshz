@@ -10,6 +10,7 @@ import "./index.css";
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const GamePage = lazy(() => import("./pages/GamePage.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
+const SoloPage = lazy(() => import("./pages/SoloPage.tsx"));
 
 function RouteLoading() {
   return (
@@ -114,6 +115,8 @@ createRoot(document.getElementById("root")!).render(
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/play/:slug" element={<GamePage />} />
+              <Route path="/solo/:gameType" element={<SoloPage />} />
+              <Route path="/solo" element={<SoloPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
