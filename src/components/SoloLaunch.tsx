@@ -4,9 +4,9 @@ import { DifficultyPicker } from "@/components/DifficultyPicker";
 import { GameIcon } from "@/components/GameIcon";
 import {
   SINGLE_PLAYER_GAMES,
-  type Difficulty,
   type SinglePlayerGame,
-} from "@/lib/singlePlayer";
+} from "@/lib/ai";
+import type { Difficulty } from "@/lib/design-tokens";
 import { getGameEntry } from "@/lib/gameCatalog";
 import { Button } from "@/components/ui/button";
 
