@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { GameIcon } from "@/components/GameIcon";
 import { getGameEntry } from "@/lib/gameCatalog";
@@ -24,8 +24,14 @@ import { CelebrationOverlay } from "@/components/CelebrationOverlay";
 
 export default function SoloPage() {
   const { gameType = "tic_tac_toe" } = useParams<{ gameType: string }>();
+  const [searchParams] = useSearchParams();
   const entry = getGameEntry(gameType);
-  const [difficulty, setDifficulty] = useState<Difficulty>("intermediate");
+  const initialDifficulty = ((): Difficulty => {
+    const q = searchParams.get("difficulty");
+    if (q === "beginner" || q === "intermediate" || q === "expert") return q;
+    return "intermediate";
+  })();
+  const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
   const [soundOn, setSoundOn] = useState(() => !isSfxMuted());
   const [angle, setAngle] = useState(0);
   const [power, setPower] = useState<PongPower>(2);
