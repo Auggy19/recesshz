@@ -51,15 +51,12 @@ export type GameIconId =
 
 export type GameCatalogEntry = {
   type: SupportedGameType;
-  /** URL-friendly slug for ?game= and share links */
   slug: string;
   name: string;
-  /** Short chip label (room picker) */
   shortName: string;
   blurb: string;
   icon: GameIconId;
   accent: GameAccent;
-  /** Live WebRTC optional path */
   supportsLive: boolean;
   available: boolean;
 };
@@ -160,7 +157,6 @@ export function getGameEntry(
   return GAME_CATALOG.find((g) => g.type === type || g.slug === type);
 }
 
-/** Map friendly URL / room query values → server game type. */
 export function urlGameToType(raw: string | null): SupportedGameType | null {
   if (!raw) return null;
   const key = raw.trim().toLowerCase();
@@ -194,7 +190,6 @@ export function isSupportedGameType(type: string): type is SupportedGameType {
   return GAME_CATALOG.some((g) => g.type === type);
 }
 
-/** Client-side fresh state mirror (Edge remains authoritative). */
 export function freshStateFor(gameType: string): unknown {
   switch (gameType) {
     case GAME_TYPE:
@@ -216,51 +211,51 @@ export function freshStateFor(gameType: string): unknown {
   }
 }
 
-/** Tailwind-friendly accent classes for cohesive chips / tiles. */
+/** High-contrast gradient tiles for professional icon visibility. */
 export const ACCENT_CLASSES: Record<
   GameAccent,
   { tile: string; text: string; ring: string; soft: string }
 > = {
   amber: {
-    tile: "from-amber-400 to-amber-600",
-    text: "text-amber-600 dark:text-amber-400",
-    ring: "ring-amber-500/30",
-    soft: "bg-amber-500/10",
+    tile: "from-[#FBBF24] via-[#F5A623] to-[#B45309]",
+    text: "text-amber-700 dark:text-amber-300",
+    ring: "ring-amber-600/40",
+    soft: "bg-amber-500/15",
   },
   sky: {
-    tile: "from-sky-400 to-sky-600",
-    text: "text-sky-600 dark:text-sky-400",
-    ring: "ring-sky-500/30",
-    soft: "bg-sky-500/10",
+    tile: "from-[#38BDF8] via-[#0EA5E9] to-[#0369A1]",
+    text: "text-sky-700 dark:text-sky-300",
+    ring: "ring-sky-600/40",
+    soft: "bg-sky-500/15",
   },
   rose: {
-    tile: "from-rose-400 to-rose-600",
-    text: "text-rose-600 dark:text-rose-400",
-    ring: "ring-rose-500/30",
-    soft: "bg-rose-500/10",
+    tile: "from-[#FB7185] via-[#F43F5E] to-[#9F1239]",
+    text: "text-rose-700 dark:text-rose-300",
+    ring: "ring-rose-600/40",
+    soft: "bg-rose-500/15",
   },
   emerald: {
-    tile: "from-emerald-400 to-emerald-600",
-    text: "text-emerald-600 dark:text-emerald-400",
-    ring: "ring-emerald-500/30",
-    soft: "bg-emerald-500/10",
+    tile: "from-[#34D399] via-[#10B981] to-[#065F46]",
+    text: "text-emerald-700 dark:text-emerald-300",
+    ring: "ring-emerald-600/40",
+    soft: "bg-emerald-500/15",
   },
   violet: {
-    tile: "from-violet-400 to-violet-600",
-    text: "text-violet-600 dark:text-violet-400",
-    ring: "ring-violet-500/30",
-    soft: "bg-violet-500/10",
+    tile: "from-[#A78BFA] via-[#8B5CF6] to-[#5B21B6]",
+    text: "text-violet-700 dark:text-violet-300",
+    ring: "ring-violet-600/40",
+    soft: "bg-violet-500/15",
   },
   slate: {
-    tile: "from-slate-400 to-slate-600",
-    text: "text-slate-600 dark:text-slate-300",
-    ring: "ring-slate-500/30",
-    soft: "bg-slate-500/10",
+    tile: "from-[#94A3B8] via-[#64748B] to-[#1E293B]",
+    text: "text-slate-700 dark:text-slate-200",
+    ring: "ring-slate-600/40",
+    soft: "bg-slate-500/15",
   },
   orange: {
-    tile: "from-orange-400 to-orange-600",
-    text: "text-orange-600 dark:text-orange-400",
-    ring: "ring-orange-500/30",
-    soft: "bg-orange-500/10",
+    tile: "from-[#FB923C] via-[#F97316] to-[#9A3412]",
+    text: "text-orange-700 dark:text-orange-300",
+    ring: "ring-orange-600/40",
+    soft: "bg-orange-500/15",
   },
 };
