@@ -67,6 +67,12 @@ const GAME_ART: Record<string, React.ReactNode> = {
 
 const upcomingGames: GameCard[] = [
   {
+    name: "Live Pong",
+    blurb:
+      "Real-time 2-player Pong over the network — both paddles live, same court. Coming soon.",
+    art: <PongArt className="w-full max-w-[92px]" />,
+  },
+  {
     name: "Truth or Dare",
     blurb: "Choose carefully.",
     art: <TruthOrDareArt className="w-full max-w-[92px]" />,
@@ -285,7 +291,7 @@ export default function Landing() {
                 className="group relative col-span-2 flex flex-col items-start gap-4 rounded-[1.75rem] border-2 border-primary/60 bg-card p-6 text-left shadow-soft transition-all duration-200 hover:-translate-y-1 hover:border-primary hover:shadow-lift lg:col-span-2"
               >
                 <div className="absolute right-5 top-5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary shadow-chip">
-                  Ready to play
+                  {g.type === "pong" ? "Play now" : "Ready to play"}
                 </div>
                 <div className="flex items-center justify-center rounded-2xl border border-border bg-[#FFF9E5] p-4 shadow-chip dark:bg-amber-950/30">
                   {art}
@@ -300,31 +306,61 @@ export default function Landing() {
                   </p>
                 </div>
                 <div className="mt-1 flex w-full flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCreateGame(g.type)}
-                    disabled={creating !== null}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all hover:brightness-105 disabled:opacity-50"
-                  >
-                    {creating === g.type ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Link2 className="size-4" />
-                    )}
-                    Create game
-                  </button>
-                  {soloOk && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/solo/${g.type}?difficulty=intermediate`)
-                      }
-                      disabled={creating !== null}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground shadow-chip transition-all hover:border-primary/40 hover:bg-accent disabled:opacity-50"
-                    >
-                      <Bot className="size-4 text-primary" />
-                      Solo
-                    </button>
+                  {g.type === "pong" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate("/solo/pong?difficulty=intermediate")
+                        }
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all hover:brightness-105"
+                      >
+                        <Gamepad2 className="size-4" />
+                        Play
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateGame(g.type)}
+                        disabled={creating !== null}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground shadow-chip transition-all hover:border-primary/40 hover:bg-accent disabled:opacity-50"
+                      >
+                        {creating === g.type ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Link2 className="size-4" />
+                        )}
+                        Link play
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateGame(g.type)}
+                        disabled={creating !== null}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-b from-primary to-primary-deep px-5 py-2.5 text-sm font-bold text-white shadow-btn-amber transition-all hover:brightness-105 disabled:opacity-50"
+                      >
+                        {creating === g.type ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Link2 className="size-4" />
+                        )}
+                        Create game
+                      </button>
+                      {soloOk && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/solo/${g.type}?difficulty=intermediate`)
+                          }
+                          disabled={creating !== null}
+                          className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground shadow-chip transition-all hover:border-primary/40 hover:bg-accent disabled:opacity-50"
+                        >
+                          <Bot className="size-4 text-primary" />
+                          Solo
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
