@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Spike · Live Pong</title>
+    <style>
+      :root {
+        --ink: #1a1a1a;
+        --cream: #fff9e5;
+        --amber: #f5a623;
+        --amber-deep: #b45309;
+        --muted: #6b7280;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--ink);
+        color: var(--cream);
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+      .wrap {
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 16px 14px 28px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 1.15rem;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+      .sub {
+        margin: 0 0 14px;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-weight: 800;
+        font-size: 1rem;
+      }
+      .hud .meta {
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: center;
+      }
+      .court {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        max-width: 320px;
+        margin: 0 auto;
+        background: var(--cream);
+        border: 3px solid var(--amber);
+        border-radius: 1.1rem;
+        box-shadow: 0 4px 0 var(--amber-deep);
+        touch-action: none;
+        overflow: hidden;
+      }
+      .line {
+        position: absolute;
+        left: 10%;
+        right: 10%;
+        top: 50%;
+        border-top: 2px dashed rgba(26, 26, 26, 0.35);
+      }
+      .paddle {
+        position: absolute;
+        height: 2.8%;
+        width: 22%;
+        border-radius: 2px;
+        background: var(--ink);
+      }
+      .paddle.you {
+        background: var(--amber);
+        box-shadow: 0 2px 0 var(--amber-deep);
+      }
+      .ball {
+        position: absolute;
+        width: 4%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: var(--amber);
+        border: 2px solid var(--ink);
+        transform: translate(-50%, -50%);
+      }
+      .banner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+      .banner span {
+        background: var(--ink);
+        color: var(--cream);
+        border: 2px solid var(--amber);
+        border-radius: 999px;
+        padding: 8px 16px;
+        font-weight: 900;
+        font-size: 0.9rem;
+        box-shadow: 0 3px 0 var(--amber);
+      }
+      .status {
+        margin-top: 12px;
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--muted);
+        min-height: 1.2em;
+      }
+      .metrics {
+        margin-top: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.65rem;
+        color: var(--muted);
+        text-align: center;
+      }
+      button {
+        display: block;
+        width: 100%;
+        max-width: 320px;
+        margin: 12px auto 0;
+        padding: 12px;
+        border: 2px solid var(--amber);
+        border-radius: 999px;
+        background: var(--amber);
+        color: var(--ink);
+        font-weight: 900;
+        font-size: 0.9rem;
+        cursor: pointer;
+        box-shadow: 0 3px 0 var(--amber-deep);
+      }
+      button:active {
+        transform: translateY(2px);
+        box-shadow: none;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--cream);
+        box-shadow: none;
+      }
+      .hint {
+        margin-top: 10px;
+        font-size: 0.7rem;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Spike · Live Pong</h1>
+      <p class="sub">Isolated WS proof · not Recess · open two tabs</p>
+
+      <div class="hud">
+        <span id="scoreYou">YOU 0</span>
+        <span class="meta" id="phaseLabel">connecting…</span>
+        <span id="scoreOpp">OPP 0</span>
+      </div>
+
+      <div class="court" id="court" aria-label="Pong court">
+        <div class="line"></div>
+        <div class="paddle" id="padTop"></div>
+        <div class="paddle you" id="padBottom"></div>
+        <div class="ball" id="ball"></div>
+        <div class="banner" id="banner" hidden><span id="bannerText"></span></div>
+      </div>
+
+      <p class="status" id="status">Connecting…</p>
+      <p class="metrics" id="metrics">—</p>
+      <button type="button" id="rematch" class="ghost" hidden>Rematch</button>
+      <p class="hint">
+        Drag on the court (or ← → / A D). Server owns the ball.
+        Room: <strong id="roomLabel">demo</strong>
+      </p>
+    </div>
+    <script src="/client.js"></script>
+  </body>
+</html>
