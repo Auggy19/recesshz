@@ -1,6 +1,6 @@
 /**
- * Real-time vertical arcade Pong for Solo vs AI.
- * Continuous paddle control, wall/paddle bounce acceleration, difficulty-scaled AI.
+ * Classic single-player Pong vs AI — fully client-side, Recess-branded.
+ * Touch-drag / arrow keys. Fair AI with lag + error. First to 7.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -8,78 +8,71 @@ import type { Difficulty } from "@/lib/design-tokens";
 import { playCelebration } from "@/lib/celebration";
 
 const TARGET = 7;
-const COURT_W = 100;
-const COURT_H = 100;
-const PADDLE_W = 22;
-const PADDLE_H = 2.8;
-const BALL_R = 1.8;
-const BASE_SPEED = 38;
-const MAX_SPEED = 95;
-const ACCEL_WALL = 1.06;
-const ACCEL_PADDLE = 1.12;
-
-type Props = {
-  difficulty: Difficulty;
-  onMatchEnd?: (won: boolean) => void;
-};
+const W = 100;
+const H = 100;
+const PW = 24;
+const PH = 2.6;
+const BR = 2.0;
+const BASE = 36;
+const MAX = 88;
+const WALL_ACC = 1.05;
+const PAD_ACC = 1.1;
 
 type Phase = "ready" | "playing" | "point" | "match";
 
-function aiSpeed(d: Difficulty) {
-  if (d === "beginner") return 28;
-  if (d === "expert") return 55;
-  return 40;
-}
-function aiError(d: Difficulty) {
-  if (d === "beginner") return 14;
-  if (d === "expert") return 3;
-  return 8;
-}
-function aiReaction(d: Difficulty) {
-  if (d === "beginner") return 0.35;
-  if (d === "expert") return 0.85;
-  return 0.55;
+type Props = {
+  difficulty?: Difficulty;
+  onMatchEnd?: (won: boolean) => void;
+};
+
+function aiParams(d: Difficulty) {
+  if (d === "beginner") return { speed: 26, pull: 0.32, noise: 16 };
+  if (d === "expert") return { speed: 52, pull: 0.78, noise: 3.5 };
+  return { speed: 38, pull: 0.52, noise: 9 };
 }
 
-export function ArcadePong({ difficulty, onMatchEnd }: Props) {
+export function ArcadePong({
+  difficulty = "intermediate",
+  onMatchEnd,
+}: Props) {
   const [score, setScore] = useState({ you: 0, ai: 0 });
   const [phase, setPhase] = useState<Phase>("ready");
-  const [message, setMessage] = useState("Tap or press Space to serve");
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const [msg, setMsg] = useState("Drag the court or use ← →");
+  const [, setTick] = useState(0);
+  const courtRef = useRef<HTMLDivElement>(null);
 
   const sim = useRef({
     youX: 50,
     aiX: 50,
-    ballX: 50,
-    ballY: 50,
+    bx: 50,
+    by: 50,
     vx: 0,
     vy: 0,
-    speed: BASE_SPEED,
-    keys: { left: false, right: false },
-    touchDir: 0 as -1 | 0 | 1,
+    speed: BASE,
+    left: false,
+    right: false,
+    dragging: false,
     phase: "ready" as Phase,
-    scoreYou: 0,
-    scoreAi: 0,
+    you: 0,
+    ai: 0,
     difficulty,
   });
-
-  const [frame, setFrame] = useState(0);
 
   useEffect(() => {
     sim.current.difficulty = difficulty;
   }, [difficulty]);
 
-  const resetBall = useCallback((towardYou: boolean) => {
+  const serveBall = useCallback((towardBottom: boolean) => {
     const s = sim.current;
-    s.ballX = 50;
-    s.ballY = 50;
-    s.speed = BASE_SPEED;
-    const angle = (Math.random() * 0.6 - 0.3) * Math.PI;
-    s.vx = Math.sin(angle);
-    s.vy = (towardYou ? 1 : -1) * Math.cos(angle);
-    const mag = Math.hypot(s.vx, s.vy) || 1;
-    s.vx /= mag;
-    s.vy /= mag;
+    s.bx = 50;
+    s.by = 50;
+    s.speed = BASE;
+    const ang = (Math.random() * 0.7 - 0.35) * Math.PI;
+    s.vx = Math.sin(ang);
+    s.vy = (towardBottom ? 1 : -1) * Math.abs(Math.cos(ang));
+    const m = Math.hypot(s.vx, s.vy) || 1;
+    s.vx /= m;
+    s.vy /= m;
   }, []);
 
   const startPoint = useCallback(() => {
@@ -87,38 +80,37 @@ export function ArcadePong({ difficulty, onMatchEnd }: Props) {
     if (s.phase === "match") return;
     s.phase = "playing";
     setPhase("playing");
-    setMessage("");
-    resetBall(Math.random() > 0.5);
-  }, [resetBall]);
+    setMsg("");
+    serveBall(Math.random() > 0.5);
+  }, [serveBall]);
 
   const award = useCallback(
     (to: "you" | "ai") => {
       const s = sim.current;
-      if (to === "you") s.scoreYou += 1;
-      else s.scoreAi += 1;
-      setScore({ you: s.scoreYou, ai: s.scoreAi });
+      if (to === "you") s.you += 1;
+      else s.ai += 1;
+      setScore({ you: s.you, ai: s.ai });
+      s.bx = 50;
+      s.by = 50;
+      s.vx = 0;
+      s.vy = 0;
 
-      if (s.scoreYou >= TARGET || s.scoreAi >= TARGET) {
+      if (s.you >= TARGET || s.ai >= TARGET) {
         s.phase = "match";
         setPhase("match");
-        const won = s.scoreYou >= TARGET;
-        setMessage(won ? "You win!" : "AI wins");
+        const won = s.you >= TARGET;
+        setMsg(won ? "You win!" : "AI wins");
         void playCelebration(won ? "win" : "loss");
         onMatchEnd?.(won);
         return;
       }
-
       s.phase = "point";
       setPhase("point");
-      setMessage(to === "you" ? "Point!" : "AI scored");
+      setMsg(to === "you" ? "Point!" : "AI scored");
       void playCelebration("point");
-      s.ballX = 50;
-      s.ballY = 50;
-      s.vx = 0;
-      s.vy = 0;
       window.setTimeout(() => {
         if (sim.current.phase === "point") startPoint();
-      }, 900);
+      }, 750);
     },
     [onMatchEnd, startPoint],
   );
@@ -126,100 +118,92 @@ export function ArcadePong({ difficulty, onMatchEnd }: Props) {
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
-
-    const tick = (now: number) => {
-      const dt = Math.min(0.033, (now - last) / 1000);
+    const loop = (now: number) => {
+      const dt = Math.min(0.032, (now - last) / 1000);
       last = now;
       const s = sim.current;
-      const d = s.difficulty;
+      const ap = aiParams(s.difficulty);
 
-      const playerSpeed = 70;
-      let move = 0;
-      if (s.keys.left) move -= 1;
-      if (s.keys.right) move += 1;
-      if (s.touchDir) move = s.touchDir;
-      s.youX = Math.max(
-        PADDLE_W / 2,
-        Math.min(COURT_W - PADDLE_W / 2, s.youX + move * playerSpeed * dt),
-      );
-
-      if (s.phase === "playing") {
-        const target =
-          s.ballX + (Math.random() - 0.5) * aiError(d) * (s.vy < 0 ? 1 : 0.3);
-        const react = aiReaction(d);
-        const desired = s.aiX + (target - s.aiX) * react * dt * 8;
-        const maxStep = aiSpeed(d) * dt;
-        const delta = Math.max(-maxStep, Math.min(maxStep, desired - s.aiX));
-        s.aiX = Math.max(
-          PADDLE_W / 2,
-          Math.min(COURT_W - PADDLE_W / 2, s.aiX + delta),
-        );
+      if (!s.dragging) {
+        let m = 0;
+        if (s.left) m -= 1;
+        if (s.right) m += 1;
+        s.youX = Math.max(PW / 2, Math.min(W - PW / 2, s.youX + m * 72 * dt));
       }
 
       if (s.phase === "playing") {
-        s.ballX += s.vx * s.speed * dt;
-        s.ballY += s.vy * s.speed * dt;
+        const comingUp = s.vy < 0;
+        const target =
+          s.bx + (Math.random() - 0.5) * (comingUp ? ap.noise : ap.noise * 0.4);
+        const pull = comingUp ? ap.pull : ap.pull * 0.25;
+        const desired = s.aiX + (target - s.aiX) * pull;
+        const step = Math.max(
+          -ap.speed * dt,
+          Math.min(ap.speed * dt, desired - s.aiX),
+        );
+        s.aiX = Math.max(PW / 2, Math.min(W - PW / 2, s.aiX + step));
+      }
 
-        if (s.ballX - BALL_R <= 0) {
-          s.ballX = BALL_R;
+      if (s.phase === "playing") {
+        s.bx += s.vx * s.speed * dt;
+        s.by += s.vy * s.speed * dt;
+
+        if (s.bx - BR <= 0) {
+          s.bx = BR;
           s.vx = Math.abs(s.vx);
-          s.speed = Math.min(MAX_SPEED, s.speed * ACCEL_WALL);
-        } else if (s.ballX + BALL_R >= COURT_W) {
-          s.ballX = COURT_W - BALL_R;
+          s.speed = Math.min(MAX, s.speed * WALL_ACC);
+        } else if (s.bx + BR >= W) {
+          s.bx = W - BR;
           s.vx = -Math.abs(s.vx);
-          s.speed = Math.min(MAX_SPEED, s.speed * ACCEL_WALL);
+          s.speed = Math.min(MAX, s.speed * WALL_ACC);
         }
 
-        const aiTop = 4;
-        const aiBot = aiTop + PADDLE_H;
+        const at = 3.5;
+        const ab = at + PH;
         if (
           s.vy < 0 &&
-          s.ballY - BALL_R <= aiBot &&
-          s.ballY + BALL_R >= aiTop &&
-          s.ballX >= s.aiX - PADDLE_W / 2 - BALL_R &&
-          s.ballX <= s.aiX + PADDLE_W / 2 + BALL_R
+          s.by - BR <= ab &&
+          s.by + BR >= at &&
+          s.bx >= s.aiX - PW / 2 - BR &&
+          s.bx <= s.aiX + PW / 2 + BR
         ) {
-          s.ballY = aiBot + BALL_R;
+          s.by = ab + BR;
           s.vy = Math.abs(s.vy);
-          const offset = (s.ballX - s.aiX) / (PADDLE_W / 2);
-          s.vx = Math.max(-0.95, Math.min(0.95, s.vx + offset * 0.55));
-          const mag = Math.hypot(s.vx, s.vy) || 1;
-          s.vx /= mag;
-          s.vy /= mag;
-          s.speed = Math.min(MAX_SPEED, s.speed * ACCEL_PADDLE);
+          const o = (s.bx - s.aiX) / (PW / 2);
+          s.vx = Math.max(-0.92, Math.min(0.92, s.vx * 0.85 + o * 0.6));
+          const m = Math.hypot(s.vx, s.vy) || 1;
+          s.vx /= m;
+          s.vy /= m;
+          s.speed = Math.min(MAX, s.speed * PAD_ACC);
         }
 
-        const youBot = 96;
-        const youTop = youBot - PADDLE_H;
+        const pb = 96.5;
+        const pt = pb - PH;
         if (
           s.vy > 0 &&
-          s.ballY + BALL_R >= youTop &&
-          s.ballY - BALL_R <= youBot &&
-          s.ballX >= s.youX - PADDLE_W / 2 - BALL_R &&
-          s.ballX <= s.youX + PADDLE_W / 2 + BALL_R
+          s.by + BR >= pt &&
+          s.by - BR <= pb &&
+          s.bx >= s.youX - PW / 2 - BR &&
+          s.bx <= s.youX + PW / 2 + BR
         ) {
-          s.ballY = youTop - BALL_R;
+          s.by = pt - BR;
           s.vy = -Math.abs(s.vy);
-          const offset = (s.ballX - s.youX) / (PADDLE_W / 2);
-          s.vx = Math.max(-0.95, Math.min(0.95, s.vx + offset * 0.55));
-          const mag = Math.hypot(s.vx, s.vy) || 1;
-          s.vx /= mag;
-          s.vy /= mag;
-          s.speed = Math.min(MAX_SPEED, s.speed * ACCEL_PADDLE);
+          const o = (s.bx - s.youX) / (PW / 2);
+          s.vx = Math.max(-0.92, Math.min(0.92, s.vx * 0.85 + o * 0.6));
+          const m = Math.hypot(s.vx, s.vy) || 1;
+          s.vx /= m;
+          s.vy /= m;
+          s.speed = Math.min(MAX, s.speed * PAD_ACC);
         }
 
-        if (s.ballY < -2) {
-          award("you");
-        } else if (s.ballY > COURT_H + 2) {
-          award("ai");
-        }
+        if (s.by < -3) award("you");
+        else if (s.by > H + 3) award("ai");
       }
 
-      setFrame((f) => (f + 1) % 100000);
-      raf = requestAnimationFrame(tick);
+      setTick((t) => (t + 1) % 1e6);
+      raf = requestAnimationFrame(loop);
     };
-
-    raf = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [award]);
 
@@ -227,24 +211,23 @@ export function ArcadePong({ difficulty, onMatchEnd }: Props) {
     const down = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
         e.preventDefault();
-        sim.current.keys.left = true;
+        sim.current.left = true;
       }
       if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
         e.preventDefault();
-        sim.current.keys.right = true;
+        sim.current.right = true;
       }
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        if (sim.current.phase === "ready" || sim.current.phase === "point") {
+        if (sim.current.phase === "ready" || sim.current.phase === "point")
           startPoint();
-        }
       }
     };
     const up = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A")
-        sim.current.keys.left = false;
+        sim.current.left = false;
       if (e.key === "ArrowRight" || e.key === "d" || e.key === "D")
-        sim.current.keys.right = false;
+        sim.current.right = false;
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -254,151 +237,140 @@ export function ArcadePong({ difficulty, onMatchEnd }: Props) {
     };
   }, [startPoint]);
 
-  const onPointer = (dir: -1 | 0 | 1) => {
-    sim.current.touchDir = dir;
+  const pointerToX = (clientX: number) => {
+    const el = courtRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pct = ((clientX - r.left) / r.width) * 100;
+    sim.current.youX = Math.max(PW / 2, Math.min(W - PW / 2, pct));
   };
 
-  const resetMatch = () => {
+  const reset = () => {
     const s = sim.current;
-    s.scoreYou = 0;
-    s.scoreAi = 0;
+    s.you = 0;
+    s.ai = 0;
     s.youX = 50;
     s.aiX = 50;
-    s.ballX = 50;
-    s.ballY = 50;
+    s.bx = 50;
+    s.by = 50;
     s.vx = 0;
     s.vy = 0;
-    s.speed = BASE_SPEED;
+    s.speed = BASE;
     s.phase = "ready";
     setScore({ you: 0, ai: 0 });
     setPhase("ready");
-    setMessage("Tap or press Space to serve");
+    setMsg("Drag the court or use ← →");
   };
 
   const s = sim.current;
-  void frame;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm font-bold">
-        <span className={cn(score.you > score.ai && "text-primary")}>
-          You {score.you}
+      <div className="flex items-center justify-between font-display text-base font-black tracking-tight">
+        <span className={cn(score.you > score.ai && "text-[#F5A623]")}>
+          YOU {score.you}
         </span>
-        <span className="text-xs font-semibold text-muted-foreground">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           First to {TARGET}
         </span>
-        <span className={cn(score.ai > score.you && "text-primary")}>
+        <span className={cn(score.ai > score.you && "text-[#F5A623]")}>
           AI {score.ai}
         </span>
       </div>
 
       <div
-        ref={canvasRef}
-        className="relative mx-auto w-full max-w-[min(100%,320px)] touch-none select-none overflow-hidden rounded-3xl border-2 border-[#1A1A1A] bg-[#FFF9E5] shadow-lift dark:bg-amber-950/40"
+        ref={courtRef}
+        className="relative mx-auto w-full max-w-[min(100%,300px)] touch-none select-none overflow-hidden rounded-[1.25rem] border-[3px] border-[#1A1A1A] bg-[#FFF9E5] shadow-[0_4px_0_#1A1A1A] dark:bg-[#2a2418]"
         style={{ aspectRatio: "3 / 4" }}
-        onPointerDown={() => {
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          sim.current.dragging = true;
+          pointerToX(e.clientX);
           if (phase === "ready" || phase === "point") startPoint();
         }}
+        onPointerMove={(e) => {
+          if (!sim.current.dragging) return;
+          pointerToX(e.clientX);
+        }}
+        onPointerUp={() => {
+          sim.current.dragging = false;
+        }}
+        onPointerCancel={() => {
+          sim.current.dragging = false;
+        }}
       >
-        <div className="pointer-events-none absolute inset-x-4 top-1/2 h-px -translate-y-1/2 border-t-2 border-dashed border-[#1A1A1A]/30" />
+        <div
+          className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-[#1A1A1A]/35"
+          aria-hidden
+        />
 
         <div
-          className="absolute h-[2.8%] rounded-full bg-[#1A1A1A] shadow-md"
+          className="absolute rounded-sm bg-[#1A1A1A]"
           style={{
-            width: `${PADDLE_W}%`,
-            left: `${s.aiX - PADDLE_W / 2}%`,
-            top: "4%",
+            width: `${PW}%`,
+            height: `${PH}%`,
+            left: `${s.aiX - PW / 2}%`,
+            top: "3.5%",
           }}
         />
 
         <div
-          className="absolute h-[2.8%] rounded-full bg-gradient-to-r from-primary to-primary-deep shadow-[0_2px_12px_rgba(245,166,35,0.5)]"
+          className="absolute rounded-sm bg-[#F5A623] shadow-[0_2px_0_#B45309]"
           style={{
-            width: `${PADDLE_W}%`,
-            left: `${s.youX - PADDLE_W / 2}%`,
-            bottom: "4%",
+            width: `${PW}%`,
+            height: `${PH}%`,
+            left: `${s.youX - PW / 2}%`,
+            bottom: "3.5%",
           }}
         />
 
         <div
-          className="absolute rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] shadow-[0_2px_14px_rgba(245,166,35,0.6)]"
+          className="absolute rounded-full bg-[#F5A623] ring-2 ring-[#1A1A1A]"
           style={{
-            width: `${BALL_R * 2}%`,
-            height: `${BALL_R * 2 * 0.75}%`,
-            left: `${s.ballX - BALL_R}%`,
-            top: `${s.ballY - BALL_R}%`,
+            width: `${BR * 2.2}%`,
+            aspectRatio: "1",
+            left: `${s.bx - BR * 1.1}%`,
+            top: `${s.by - BR * 0.85}%`,
           }}
         />
 
-        {message && phase !== "playing" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]">
-            <p className="rounded-full bg-[#1A1A1A]/90 px-4 py-2 text-sm font-bold text-white shadow-lg">
-              {message}
+        {msg && phase !== "playing" && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <p className="rounded-full border-2 border-[#1A1A1A] bg-[#1A1A1A] px-4 py-2 text-center text-sm font-black text-[#FFF9E5] shadow-[0_3px_0_#F5A623]">
+              {msg}
             </p>
           </div>
         )}
       </div>
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          aria-label="Move left"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onPointer(-1);
-          }}
-          onPointerUp={() => onPointer(0)}
-          onPointerLeave={() => onPointer(0)}
-          onPointerCancel={() => onPointer(0)}
-          className="flex h-16 flex-1 items-center justify-center rounded-2xl border-2 border-border bg-card text-lg font-black shadow-soft active:scale-[0.98] active:border-primary"
-        >
-          ← Left
-        </button>
-        <button
-          type="button"
-          aria-label="Move right"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onPointer(1);
-          }}
-          onPointerUp={() => onPointer(0)}
-          onPointerLeave={() => onPointer(0)}
-          onPointerCancel={() => onPointer(0)}
-          className="flex h-16 flex-1 items-center justify-center rounded-2xl border-2 border-border bg-card text-lg font-black shadow-soft active:scale-[0.98] active:border-primary"
-        >
-          Right →
-        </button>
-      </div>
+      <p className="text-center text-[11px] font-semibold text-muted-foreground">
+        Drag on the board · Arrow keys / A D · Space to serve
+      </p>
 
       <div className="flex gap-2">
         {phase === "ready" || phase === "point" ? (
           <button
             type="button"
             onClick={startPoint}
-            className="flex-1 rounded-full bg-gradient-to-b from-emerald-500 to-emerald-700 py-3 text-sm font-bold text-white shadow-soft"
+            className="flex-1 rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] py-3 text-sm font-black text-[#1A1A1A] shadow-[0_3px_0_#1A1A1A] active:translate-y-0.5 active:shadow-none"
           >
-            {phase === "ready" ? "Serve" : "Next point"}
+            {phase === "ready" ? "Serve" : "Next"}
           </button>
         ) : phase === "match" ? (
           <button
             type="button"
-            onClick={resetMatch}
-            className="flex-1 rounded-full bg-gradient-to-b from-primary to-primary-deep py-3 text-sm font-bold text-white shadow-btn-amber"
+            onClick={reset}
+            className="flex-1 rounded-full border-2 border-[#1A1A1A] bg-[#F5A623] py-3 text-sm font-black text-[#1A1A1A] shadow-[0_3px_0_#1A1A1A]"
           >
             Play again
           </button>
         ) : (
-          <p className="flex-1 text-center text-xs font-semibold text-muted-foreground">
-            Hold Left / Right · Arrow keys on desktop
-          </p>
-        )}
-        {(phase === "playing" || phase === "match") && (
           <button
             type="button"
-            onClick={resetMatch}
-            className="rounded-full border border-border px-4 py-3 text-xs font-bold"
+            onClick={reset}
+            className="flex-1 rounded-full border-2 border-border py-3 text-xs font-bold text-muted-foreground"
           >
-            Reset
+            Reset match
           </button>
         )}
       </div>
