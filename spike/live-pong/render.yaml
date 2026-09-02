@@ -1,0 +1,16 @@
+# Render Blueprint — deploy only the isolated live-pong spike
+# Dashboard: New → Blueprint → connect Auggy19/recesshz → this file
+# Or: New Web Service → root directory spike/live-pong
+
+services:
+  - type: web
+    name: recess-spike-live-pong
+    runtime: node
+    plan: free
+    rootDir: spike/live-pong
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /metrics
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

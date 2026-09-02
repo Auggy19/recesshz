@@ -1,0 +1,12 @@
+# Railway — set Root Directory to "spike/live-pong" in the service settings
+# (this file lives inside that root after checkout)
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+healthcheckPath = "/metrics"
+healthcheckTimeout = 10
