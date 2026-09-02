@@ -104,7 +104,7 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     name: "Pong",
     shortName: "Pong",
     blurb:
-      "Classic paddle tennis, by message. Serve an angle, read the return, and chase the rally — first to 7 points takes it. Optional live aim when both are online.",
+      "Classic vertical Pong vs AI — drag your paddle, bounce the ball, first to 7. Fully offline in the browser. Link-based play with a friend still available.",
     icon: "paddle",
     accent: "emerald",
     supportsLive: true,
