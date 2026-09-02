@@ -11,7 +11,9 @@ import { WebSocketServer } from "ws";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, "public");
+// Render / Railway / Fly inject PORT. Fallback for local only.
 const PORT = Number(process.env.PORT) || 3099;
+const HOST = process.env.HOST || "0.0.0.0";
 
 const TICK_HZ = 60;
 const BROADCAST_HZ = 15;
@@ -548,9 +550,10 @@ setInterval(() => {
   }
 }, 1000 / BROADCAST_HZ);
 
-server.listen(PORT, () => {
-  console.log(`[spike-live-pong] http://localhost:${PORT}/?room=demo`);
+server.listen(PORT, HOST, () => {
+  console.log(`[spike-live-pong] listening on http://${HOST}:${PORT}`);
+  console.log(`[spike-live-pong] open TWO clients: /?room=demo`);
   console.log(
-    `[spike-live-pong] open TWO tabs; 15 Hz snapshots; first to ${TARGET_SCORE}`,
+    `[spike-live-pong] 15 Hz snapshots; first to ${TARGET_SCORE}; WS on same port`,
   );
 });
