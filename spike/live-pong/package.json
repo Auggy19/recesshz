@@ -1,0 +1,17 @@
+{
+  "name": "recess-spike-live-pong",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Isolated WebSocket spike for live 2-player Pong (not wired into Recess)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
