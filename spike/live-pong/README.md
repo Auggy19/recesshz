@@ -31,6 +31,12 @@ Optional: `PORT=3099 node server.mjs`
 
 Also: `curl http://localhost:3099/metrics`
 
+## Keep-alive (mobile / proxies)
+
+- **Server:** WebSocket protocol `ping` every **25s**; no `pong` → `terminate` (clears zombie seats).
+- **Client:** exponential backoff reconnect (0.5s → 30s + jitter); reconnect on `visibilitychange` (tab focus) and `online`.
+- Playing traffic at 15 Hz already keeps the socket busy; keep-alive mainly protects **lobby** and quiet periods.
+
 ## Out of scope
 
 Recess integration, device_token, TURN/WebRTC, spectators, ranked, Supabase Realtime.
