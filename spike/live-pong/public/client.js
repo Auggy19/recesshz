@@ -1,5 +1,6 @@
 /**
  * Spike client — paddle input only; render server state at 15 Hz.
+ * Keep-alive: exponential backoff reconnect, visibility + online recovery.
  */
 (function () {
   const params = new URLSearchParams(location.search);
@@ -54,7 +55,6 @@
     const youIsBottom = side === "bottom";
     const myPad = youIsBottom ? padBottom : padTop;
     const oppPad = youIsBottom ? padTop : padBottom;
-    const flip = side === "top";
 
     const topX = s.paddles.top;
     const botX = s.paddles.bottom;
@@ -70,7 +70,7 @@
 
     let bx = s.ball.x;
     let by = s.ball.y;
-    if (flip) by = 100 - by;
+    if (side === "top") by = 100 - by;
     ball.style.left = bx + "%";
     ball.style.top = by + "%";
 
@@ -82,16 +82,16 @@
     phaseLabel.textContent = s.phase.replace("_", " ");
 
     if (s.phase === "countdown") {
-      setBanner(String(s.countdownLeft ?? "\u2026"));
-      statusEl.textContent = "Get ready\u2026";
+      setBanner(String(s.countdownLeft ?? "…"));
+      statusEl.textContent = "Get ready…";
       rematchBtn.hidden = true;
     } else if (s.phase === "playing") {
       setBanner("");
-      statusEl.textContent = "Playing \u2014 drag to move";
+      statusEl.textContent = "Playing — drag to move";
       rematchBtn.hidden = true;
     } else if (s.phase === "paused") {
       setBanner("Paused");
-      statusEl.textContent = "Opponent disconnected \u2014 20s to reconnect";
+      statusEl.textContent = "Opponent disconnected — 20s to reconnect";
       rematchBtn.hidden = true;
     } else if (s.phase === "match_over") {
       const iWon =
@@ -102,7 +102,7 @@
       rematchBtn.hidden = false;
     } else if (s.phase === "lobby") {
       setBanner("Waiting");
-      statusEl.textContent = "Waiting for opponent\u2026 open a second tab";
+      statusEl.textContent = "Waiting for opponent… open a second tab";
       rematchBtn.hidden = true;
     }
   }
@@ -183,12 +183,50 @@
   }, 500);
 
   let ws;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  let intentionalClose = false;
+
+  function backoffMs(attempt) {
+    const base = Math.min(30_000, 500 * Math.pow(2, attempt));
+    const jitter = base * (Math.random() * 0.5);
+    return Math.round(base + jitter);
+  }
+
+  function scheduleReconnect(reason) {
+    if (reconnectTimer) return;
+    const delay = backoffMs(reconnectAttempt);
+    reconnectAttempt += 1;
+    statusEl.textContent =
+      "Disconnected (" +
+      reason +
+      ") \u2014 retry in " +
+      (delay / 1000).toFixed(1) +
+      "s\u2026";
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  }
+
   function connect() {
+    if (
+      ws &&
+      (ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(proto + "//" + location.host);
     statusEl.textContent = "Connecting\u2026";
+    ws = new WebSocket(proto + "//" + location.host);
 
     ws.onopen = () => {
+      reconnectAttempt = 0;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       ws.send(JSON.stringify({ type: "join", room, sessionId }));
       statusEl.textContent = "Joined \u2014 waiting for peer";
     };
@@ -248,11 +286,48 @@
       }
     };
 
+    ws.onerror = () => {};
+
     ws.onclose = () => {
-      statusEl.textContent = "Disconnected \u2014 retrying in 1.5s\u2026";
-      setTimeout(connect, 1500);
+      if (intentionalClose) return;
+      scheduleReconnect("closed");
     };
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (
+      !ws ||
+      ws.readyState === WebSocket.CLOSED ||
+      ws.readyState === WebSocket.CLOSING
+    ) {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      reconnectAttempt = 0;
+      connect();
+      return;
+    }
+    if (ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({ type: "paddle", x: myX }));
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  window.addEventListener("online", () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      reconnectAttempt = 0;
+      connect();
+    }
+  });
 
   connect();
 })();
