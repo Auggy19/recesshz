@@ -2,6 +2,7 @@
  * Isolated Live Pong spike — Node HTTP + WebSocket.
  * Server-authoritative physics. 15 Hz state broadcast.
  * Clients send paddle X only. First to 7. Pause 20s on disconnect.
+ * Keep-alive: protocol ping every 25s; no pong → terminate zombie.
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -20,6 +21,8 @@ const BROADCAST_HZ = 15;
 const TARGET_SCORE = 7;
 const RECONNECT_MS = 20_000;
 const COUNTDOWN_S = 3;
+/** Protocol ping interval — under typical proxy/NAT idle (~30–60s). */
+const PING_INTERVAL_MS = 25_000;
 
 const PW = 22;
 const PH = 2.8;
@@ -415,6 +418,7 @@ const server = http.createServer((req, res) => {
         lastBytesPerSecApprox: lastBytes,
         targetScore: TARGET_SCORE,
         reconnectMs: RECONNECT_MS,
+        pingIntervalMs: PING_INTERVAL_MS,
       }),
     );
     return;
@@ -442,6 +446,11 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
+
   ws.on("message", (buf) => {
     let msg;
     try {
@@ -550,10 +559,36 @@ setInterval(() => {
   }
 }, 1000 / BROADCAST_HZ);
 
+// Detect half-open / zombie sockets (mobile NAT, dead tabs).
+const pingInterval = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      try {
+        ws.terminate();
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch {
+      try {
+        ws.terminate();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}, PING_INTERVAL_MS);
+
+wss.on("close", () => clearInterval(pingInterval));
+
 server.listen(PORT, HOST, () => {
   console.log(`[spike-live-pong] listening on http://${HOST}:${PORT}`);
   console.log(`[spike-live-pong] open TWO clients: /?room=demo`);
   console.log(
-    `[spike-live-pong] 15 Hz snapshots; first to ${TARGET_SCORE}; WS on same port`,
+    `[spike-live-pong] 15 Hz snapshots; first to ${TARGET_SCORE}; ping every ${PING_INTERVAL_MS}ms`,
   );
 });
