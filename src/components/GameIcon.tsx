@@ -50,6 +50,20 @@ function Silhouette({ id }: { id: GameIconId }) {
           <circle cx="12" cy="12" r="2.4" />
         </g>
       );
+    case "ball":
+      return (
+        <g fill="currentColor">
+          <circle cx="12" cy="12" r="7.2" />
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.35" />
+          <path
+            d="M12 5.2v13.6M5.2 12h13.6"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            opacity="0.4"
+            fill="none"
+          />
+        </g>
+      );
     case "help":
       return (
         <g fill="currentColor">
