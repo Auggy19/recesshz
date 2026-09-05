@@ -11,6 +11,7 @@ import {
   TWENTY_QUESTIONS_GAME_TYPE,
   HANGMAN_GAME_TYPE,
   WORD_SCRAMBLE_GAME_TYPE,
+  COUNTERS_BALL_GAME_TYPE,
   freshTicTacToeState,
   freshRpsState,
   freshRedBlackState,
@@ -18,6 +19,7 @@ import {
   freshTwentyQuestionsState,
   freshHangmanState,
   freshWordScrambleState,
+  freshCountersBallState,
 } from "@/lib/gameLogic";
 
 export type SupportedGameType =
@@ -27,7 +29,8 @@ export type SupportedGameType =
   | typeof PONG_GAME_TYPE
   | typeof TWENTY_QUESTIONS_GAME_TYPE
   | typeof HANGMAN_GAME_TYPE
-  | typeof WORD_SCRAMBLE_GAME_TYPE;
+  | typeof WORD_SCRAMBLE_GAME_TYPE
+  | typeof COUNTERS_BALL_GAME_TYPE;
 
 /** Visual token for cards, chips, and icons. */
 export type GameAccent =
@@ -47,6 +50,7 @@ export type GameIconId =
   | "help"
   | "gallows"
   | "scramble"
+  | "ball"
   | "spark";
 
 export type GameCatalogEntry = {
@@ -108,6 +112,18 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     icon: "paddle",
     accent: "emerald",
     supportsLive: true,
+    available: true,
+  },
+  {
+    type: COUNTERS_BALL_GAME_TYPE,
+    slug: "counters-ball",
+    name: "Counters Ball FC",
+    shortName: "Counters Ball",
+    blurb:
+      "Bottle-cap table football. Pull back, flick one cap per turn, first to 3. Share the link — your friend flicks when they're free.",
+    icon: "ball",
+    accent: "emerald",
+    supportsLive: false,
     available: true,
   },
   {
@@ -181,6 +197,10 @@ export function urlGameToType(raw: string | null): SupportedGameType | null {
       return TWENTY_QUESTIONS_GAME_TYPE;
     case "scramble":
       return WORD_SCRAMBLE_GAME_TYPE;
+    case "football":
+    case "counters":
+    case "countersball":
+      return COUNTERS_BALL_GAME_TYPE;
     default:
       return null;
   }
@@ -200,6 +220,8 @@ export function freshStateFor(gameType: string): unknown {
       return freshRedBlackState();
     case PONG_GAME_TYPE:
       return freshPongState();
+    case COUNTERS_BALL_GAME_TYPE:
+      return freshCountersBallState(3);
     case TWENTY_QUESTIONS_GAME_TYPE:
       return freshTwentyQuestionsState();
     case HANGMAN_GAME_TYPE:
