@@ -1,6 +1,6 @@
 /**
  * Spike client — paddle input only; render server state at 15 Hz.
- * Keep-alive: exponential backoff reconnect, visibility + online recovery.
+ * Field-level state deltas + keyframes. Keep-alive: backoff reconnect.
  */
 (function () {
   const params = new URLSearchParams(location.search);
@@ -37,6 +37,11 @@
   let bytesIn = 0;
   let msgsIn = 0;
   let windowStart = performance.now();
+  let fullCount = 0;
+  let deltaCount = 0;
+
+  let localState = null;
+  let lastSeq = 0;
 
   const PW = 22;
 
@@ -50,7 +55,7 @@
   }
 
   function applyState(s) {
-    if (!side) return;
+    if (!side || !s || !s.paddles || !s.ball || !s.scores) return;
 
     const youIsBottom = side === "bottom";
     const myPad = youIsBottom ? padBottom : padTop;
@@ -79,19 +84,19 @@
     scoreYou.textContent = "YOU " + myScore;
     scoreOpp.textContent = "OPP " + oppScore;
 
-    phaseLabel.textContent = s.phase.replace("_", " ");
+    phaseLabel.textContent = String(s.phase || "").replace("_", " ");
 
     if (s.phase === "countdown") {
-      setBanner(String(s.countdownLeft ?? "…"));
-      statusEl.textContent = "Get ready…";
+      setBanner(String(s.countdownLeft ?? "\u2026"));
+      statusEl.textContent = "Get ready\u2026";
       rematchBtn.hidden = true;
     } else if (s.phase === "playing") {
       setBanner("");
-      statusEl.textContent = "Playing — drag to move";
+      statusEl.textContent = "Playing \u2014 drag to move";
       rematchBtn.hidden = true;
     } else if (s.phase === "paused") {
       setBanner("Paused");
-      statusEl.textContent = "Opponent disconnected — 20s to reconnect";
+      statusEl.textContent = "Opponent disconnected \u2014 20s to reconnect";
       rematchBtn.hidden = true;
     } else if (s.phase === "match_over") {
       const iWon =
@@ -102,9 +107,65 @@
       rematchBtn.hidden = false;
     } else if (s.phase === "lobby") {
       setBanner("Waiting");
-      statusEl.textContent = "Waiting for opponent… open a second tab";
+      statusEl.textContent = "Waiting for opponent\u2026 open a second tab";
       rematchBtn.hidden = true;
     }
+  }
+
+  function mergeState(msg) {
+    if (msg.full || !localState) {
+      fullCount += 1;
+      localState = {
+        phase: msg.phase,
+        ball: msg.ball ? { x: msg.ball.x, y: msg.ball.y } : { x: 50, y: 50 },
+        paddles: {
+          bottom: msg.paddles ? msg.paddles.bottom : 50,
+          top: msg.paddles ? msg.paddles.top : 50,
+        },
+        scores: {
+          bottom: msg.scores ? msg.scores.bottom : 0,
+          top: msg.scores ? msg.scores.top : 0,
+        },
+        target: msg.target != null ? msg.target : 7,
+        countdownLeft: msg.countdownLeft,
+        vacantSide: msg.vacantSide != null ? msg.vacantSide : null,
+        winner: msg.winner != null ? msg.winner : null,
+      };
+    } else {
+      deltaCount += 1;
+      if (msg.ball) {
+        localState.ball = { x: msg.ball.x, y: msg.ball.y };
+      }
+      if (msg.paddles) {
+        if (msg.paddles.bottom != null) {
+          localState.paddles.bottom = msg.paddles.bottom;
+        }
+        if (msg.paddles.top != null) {
+          localState.paddles.top = msg.paddles.top;
+        }
+      }
+      if (msg.scores) {
+        localState.scores = {
+          bottom: msg.scores.bottom,
+          top: msg.scores.top,
+        };
+      }
+      if (msg.phase != null) localState.phase = msg.phase;
+      if (msg.countdownLeft !== undefined) {
+        localState.countdownLeft = msg.countdownLeft;
+      }
+      if (msg.vacantSide !== undefined) {
+        localState.vacantSide = msg.vacantSide;
+      }
+      if (msg.winner !== undefined) localState.winner = msg.winner;
+      if (msg.target != null) localState.target = msg.target;
+    }
+
+    if (typeof msg.seq === "number") lastSeq = msg.seq;
+    applyState(localState);
+
+    if (side === "bottom" && localState.paddles) myX = localState.paddles.bottom;
+    else if (side === "top" && localState.paddles) myX = localState.paddles.top;
   }
 
   function pointerToX(clientX) {
@@ -174,8 +235,12 @@
     if (elapsed >= 1) {
       const bps = Math.round(bytesIn / elapsed);
       const mps = (msgsIn / elapsed).toFixed(1);
+      const f = fullCount;
+      const d = deltaCount;
+      fullCount = 0;
+      deltaCount = 0;
       metricsEl.textContent =
-        "in ~" + bps + " B/s \u00b7 " + mps + " msg/s \u00b7 target 15 Hz";
+        "in ~" + bps + " B/s \u00b7 " + mps + " msg/s \u00b7 full " + f + " / \u0394 " + d;
       bytesIn = 0;
       msgsIn = 0;
       windowStart = performance.now();
@@ -198,11 +263,7 @@
     const delay = backoffMs(reconnectAttempt);
     reconnectAttempt += 1;
     statusEl.textContent =
-      "Disconnected (" +
-      reason +
-      ") \u2014 retry in " +
-      (delay / 1000).toFixed(1) +
-      "s\u2026";
+      "Disconnected (" + reason + ") \u2014 retry in " + (delay / 1000).toFixed(1) + "s\u2026";
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
@@ -212,13 +273,14 @@
   function connect() {
     if (
       ws &&
-      (ws.readyState === WebSocket.OPEN ||
-        ws.readyState === WebSocket.CONNECTING)
+      (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
     ) {
       return;
     }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     statusEl.textContent = "Connecting\u2026";
+    localState = null;
+    lastSeq = 0;
     ws = new WebSocket(proto + "//" + location.host);
 
     ws.onopen = () => {
@@ -280,9 +342,7 @@
         return;
       }
       if (msg.type === "state") {
-        applyState(msg);
-        if (side === "bottom") myX = msg.paddles.bottom;
-        else if (side === "top") myX = msg.paddles.top;
+        mergeState(msg);
       }
     };
 
