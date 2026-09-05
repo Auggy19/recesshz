@@ -9,6 +9,7 @@ import {
   TWENTY_QUESTIONS_GAME_TYPE,
   HANGMAN_GAME_TYPE,
   WORD_SCRAMBLE_GAME_TYPE,
+  COUNTERS_BALL_GAME_TYPE,
   freshTicTacToeState,
   freshRpsState,
   freshRedBlackState,
@@ -16,6 +17,7 @@ import {
   freshTwentyQuestionsState,
   freshHangmanState,
   freshWordScrambleState,
+  freshCountersBallState,
   type Marker as LogicMarker,
   type RpsState,
   type TwentyQuestionsState,
@@ -33,6 +35,7 @@ const SUPPORTED: Set<string> = new Set([
   TWENTY_QUESTIONS_GAME_TYPE,
   HANGMAN_GAME_TYPE,
   WORD_SCRAMBLE_GAME_TYPE,
+  COUNTERS_BALL_GAME_TYPE,
 ]);
 
 export function fail(code: ApiError["code"], message: string): never {
@@ -49,6 +52,8 @@ export function freshStateFor(gameType: string): unknown {
       return freshRedBlackState();
     case PONG_GAME_TYPE:
       return freshPongState();
+    case COUNTERS_BALL_GAME_TYPE:
+      return freshCountersBallState(3);
     case TWENTY_QUESTIONS_GAME_TYPE:
       return freshTwentyQuestionsState();
     case HANGMAN_GAME_TYPE:
