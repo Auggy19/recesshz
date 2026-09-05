@@ -1,7 +1,8 @@
 /**
  * Isolated Live Pong spike — Node HTTP + WebSocket.
  * Server-authoritative physics. 15 Hz state broadcast.
- * Clients send paddle X only. First to 7. Pause 20s on disconnect.
+ * Field-level deltas + keyframes (~1s). Clients send paddle X only.
+ * First to 7. Pause 20s on disconnect.
  * Keep-alive: protocol ping every 25s; no pong → terminate zombie.
  */
 import http from "node:http";
@@ -12,7 +13,6 @@ import { WebSocketServer } from "ws";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, "public");
-// Render / Railway / Fly inject PORT. Fallback for local only.
 const PORT = Number(process.env.PORT) || 3099;
 const HOST = process.env.HOST || "0.0.0.0";
 
@@ -21,8 +21,11 @@ const BROADCAST_HZ = 15;
 const TARGET_SCORE = 7;
 const RECONNECT_MS = 20_000;
 const COUNTDOWN_S = 3;
-/** Protocol ping interval — under typical proxy/NAT idle (~30–60s). */
 const PING_INTERVAL_MS = 25_000;
+/** Full snapshot every N broadcast ticks (~1s at 15 Hz). */
+const KEYFRAME_EVERY = 15;
+/** Quantize positions to 2 decimals for wire + delta compare. */
+const Q = 100;
 
 const PW = 22;
 const PH = 2.8;
@@ -32,46 +35,20 @@ const MAX_SPEED = 85;
 const WALL_ACC = 1.05;
 const PAD_ACC = 1.1;
 
-/** @typedef {'lobby'|'countdown'|'playing'|'paused'|'match_over'} Phase */
-
-/**
- * @typedef {object} Seat
- * @property {import('ws').WebSocket|null} ws
- * @property {string|null} sessionId
- * @property {number} paddleX
- * @property {number} lastSeen
- */
-
-/**
- * @typedef {object} Room
- * @property {string} id
- * @property {Seat} bottom
- * @property {Seat} top
- * @property {Phase} phase
- * @property {number} countdownLeft
- * @property {number} scoresBottom
- * @property {number} scoresTop
- * @property {number} ballX
- * @property {number} ballY
- * @property {number} vx
- * @property {number} vy
- * @property {number} speed
- * @property {string|null} vacantSide
- * @property {ReturnType<typeof setTimeout>|null} reconnectTimer
- * @property {string|null} winner
- */
-
-/** @type {Map<string, Room>} */
+/** @type {Map<string, any>} */
 const rooms = new Map();
 
 let lastBytes = 0;
+
+function q2(n) {
+  return Math.round(n * Q) / Q;
+}
 
 function emptySeat() {
   return { ws: null, sessionId: null, paddleX: 50, lastSeen: 0 };
 }
 
 function createRoom(id) {
-  /** @type {Room} */
   const room = {
     id,
     bottom: emptySeat(),
@@ -88,6 +65,8 @@ function createRoom(id) {
     vacantSide: null,
     reconnectTimer: null,
     winner: null,
+    stateSeq: 0,
+    lastSnap: null,
   };
   rooms.set(id, room);
   return room;
@@ -121,26 +100,102 @@ function send(ws, msg) {
 
 function broadcast(room, msg) {
   const raw = JSON.stringify(msg);
-  for (const side of /** @type {const} */ (["bottom", "top"])) {
+  for (const side of ["bottom", "top"]) {
     const s = seatFor(room, side);
     if (s.ws && s.ws.readyState === 1) s.ws.send(raw);
   }
   return raw.length;
 }
 
-function statePayload(room) {
+function buildSnap(room) {
   return {
-    type: "state",
-    t: Date.now(),
     phase: room.phase,
-    ball: { x: room.ballX, y: room.ballY },
-    paddles: { bottom: room.bottom.paddleX, top: room.top.paddleX },
+    ball: { x: q2(room.ballX), y: q2(room.ballY) },
+    paddles: {
+      bottom: q2(room.bottom.paddleX),
+      top: q2(room.top.paddleX),
+    },
     scores: { bottom: room.scoresBottom, top: room.scoresTop },
     target: TARGET_SCORE,
-    countdownLeft: room.phase === "countdown" ? room.countdownLeft : undefined,
+    countdownLeft: room.phase === "countdown" ? room.countdownLeft : null,
     vacantSide: room.vacantSide,
     winner: room.winner,
   };
+}
+
+function makeWire(room, forceFull = false) {
+  room.stateSeq += 1;
+  const snap = buildSnap(room);
+  const prev = room.lastSnap;
+
+  const needFull =
+    forceFull ||
+    !prev ||
+    room.stateSeq % KEYFRAME_EVERY === 1 ||
+    prev.phase !== snap.phase;
+
+  if (needFull) {
+    room.lastSnap = snap;
+    const msg = {
+      type: "state",
+      full: true,
+      seq: room.stateSeq,
+      t: Date.now(),
+      phase: snap.phase,
+      ball: snap.ball,
+      paddles: snap.paddles,
+      scores: snap.scores,
+      target: snap.target,
+    };
+    if (snap.countdownLeft != null) msg.countdownLeft = snap.countdownLeft;
+    if (snap.vacantSide != null) msg.vacantSide = snap.vacantSide;
+    if (snap.winner != null) msg.winner = snap.winner;
+    return msg;
+  }
+
+  const d = {
+    type: "state",
+    full: false,
+    seq: room.stateSeq,
+    t: Date.now(),
+  };
+
+  if (snap.ball.x !== prev.ball.x || snap.ball.y !== prev.ball.y) {
+    d.ball = snap.ball;
+  }
+
+  const pads = {};
+  if (snap.paddles.bottom !== prev.paddles.bottom) {
+    pads.bottom = snap.paddles.bottom;
+  }
+  if (snap.paddles.top !== prev.paddles.top) {
+    pads.top = snap.paddles.top;
+  }
+  if (Object.keys(pads).length) d.paddles = pads;
+
+  if (
+    snap.scores.bottom !== prev.scores.bottom ||
+    snap.scores.top !== prev.scores.top
+  ) {
+    d.scores = snap.scores;
+  }
+
+  if (snap.countdownLeft !== prev.countdownLeft) {
+    d.countdownLeft = snap.countdownLeft;
+  }
+  if (snap.vacantSide !== prev.vacantSide) {
+    d.vacantSide = snap.vacantSide;
+  }
+  if (snap.winner !== prev.winner) {
+    d.winner = snap.winner;
+  }
+
+  room.lastSnap = snap;
+  return d;
+}
+
+function broadcastState(room, forceFull = false) {
+  return broadcast(room, makeWire(room, forceFull));
 }
 
 function serveBall(room, towardBottom) {
@@ -166,6 +221,7 @@ function resetMatch(room) {
   room.winner = null;
   room.bottom.paddleX = 50;
   room.top.paddleX = 50;
+  room.lastSnap = null;
   if (bothConnected(room)) startCountdown(room);
   else {
     room.phase = "lobby";
@@ -182,13 +238,13 @@ function startCountdown(room) {
   room.phase = "countdown";
   room.countdownLeft = COUNTDOWN_S;
   broadcast(room, { type: "countdown", n: room.countdownLeft });
-  broadcast(room, statePayload(room));
+  broadcastState(room, true);
 }
 
 function startPlay(room) {
   room.phase = "playing";
   serveBall(room, Math.random() > 0.5);
-  broadcast(room, statePayload(room));
+  broadcastState(room, true);
 }
 
 function award(room, to) {
@@ -205,7 +261,7 @@ function award(room, to) {
       winner: room.winner,
       scores: { bottom: room.scoresBottom, top: room.scoresTop },
     });
-    broadcast(room, statePayload(room));
+    broadcastState(room, true);
     return;
   }
 
@@ -319,7 +375,7 @@ function onDisconnect(room, side) {
       resumeInMs: RECONNECT_MS,
       vacantSide: side,
     });
-    broadcast(room, statePayload(room));
+    broadcastState(room, true);
 
     if (room.reconnectTimer) clearTimeout(room.reconnectTimer);
     room.reconnectTimer = setTimeout(() => {
@@ -336,7 +392,7 @@ function onDisconnect(room, side) {
         reason: "forfeit",
         scores: { bottom: room.scoresBottom, top: room.scoresTop },
       });
-      broadcast(room, statePayload(room));
+      broadcastState(room, true);
     }, RECONNECT_MS);
     return;
   }
@@ -364,9 +420,9 @@ function onJoin(room, ws, sessionId) {
     return;
   }
 
-  /** @type {any} */ (ws).__roomId = room.id;
-  /** @type {any} */ (ws).__side = side;
-  /** @type {any} */ (ws).__sessionId = sessionId;
+  ws.__roomId = room.id;
+  ws.__side = side;
+  ws.__sessionId = sessionId;
 
   send(ws, {
     type: "welcome",
@@ -397,7 +453,7 @@ function onJoin(room, ws, sessionId) {
   }
 
   broadcast(room, { type: "lobby", players: connectedCount(room) });
-  send(ws, statePayload(room));
+  send(ws, makeWire(room, true));
 }
 
 const MIME = {
@@ -419,13 +475,14 @@ const server = http.createServer((req, res) => {
         targetScore: TARGET_SCORE,
         reconnectMs: RECONNECT_MS,
         pingIntervalMs: PING_INTERVAL_MS,
+        keyframeEvery: KEYFRAME_EVERY,
+        delta: true,
       }),
     );
     return;
   }
   let filePath = url.pathname === "/" ? "/index.html" : url.pathname;
-  filePath = path.normalize(filePath).replace(/^(\\.\.[/\\])+/, "");
-  const abs = path.join(PUBLIC, filePath);
+  const abs = path.join(PUBLIC, path.normalize(filePath));
   if (!abs.startsWith(PUBLIC)) {
     res.writeHead(403);
     res.end("Forbidden");
@@ -470,8 +527,8 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    const roomId = /** @type {any} */ (ws).__roomId;
-    const side = /** @type {any} */ (ws).__side;
+    const roomId = ws.__roomId;
+    const side = ws.__side;
     if (!roomId || !side) return;
     const room = rooms.get(roomId);
     if (!room) return;
@@ -491,8 +548,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    const roomId = /** @type {any} */ (ws).__roomId;
-    const side = /** @type {any} */ (ws).__side;
+    const roomId = ws.__roomId;
+    const side = ws.__side;
     if (!roomId || !side) return;
     const room = rooms.get(roomId);
     if (!room) return;
@@ -502,14 +559,10 @@ wss.on("connection", (ws) => {
 });
 
 function cryptoRandom() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).slice(2, 10)
-  );
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
 let lastSim = Date.now();
-let lastBroadcast = Date.now();
 let bytesWindow = 0;
 let bytesWindowStart = Date.now();
 
@@ -533,14 +586,13 @@ setInterval(() => {
       startPlay(room);
     } else {
       broadcast(room, { type: "countdown", n: room.countdownLeft });
-      broadcast(room, statePayload(room));
+      broadcastState(room, true);
     }
   }
 }, 1000);
 
 setInterval(() => {
   const now = Date.now();
-  lastBroadcast = now;
   let total = 0;
   for (const room of rooms.values()) {
     if (
@@ -548,7 +600,7 @@ setInterval(() => {
       room.phase === "paused" ||
       room.phase === "countdown"
     ) {
-      total += broadcast(room, statePayload(room));
+      total += broadcastState(room, false);
     }
   }
   bytesWindow += total;
@@ -559,7 +611,6 @@ setInterval(() => {
   }
 }, 1000 / BROADCAST_HZ);
 
-// Detect half-open / zombie sockets (mobile NAT, dead tabs).
 const pingInterval = setInterval(() => {
   for (const ws of wss.clients) {
     if (ws.isAlive === false) {
@@ -589,6 +640,6 @@ server.listen(PORT, HOST, () => {
   console.log(`[spike-live-pong] listening on http://${HOST}:${PORT}`);
   console.log(`[spike-live-pong] open TWO clients: /?room=demo`);
   console.log(
-    `[spike-live-pong] 15 Hz snapshots; first to ${TARGET_SCORE}; ping every ${PING_INTERVAL_MS}ms`,
+    `[spike-live-pong] 15 Hz field-deltas; keyframe every ${KEYFRAME_EVERY}; first to ${TARGET_SCORE}`,
   );
 });
