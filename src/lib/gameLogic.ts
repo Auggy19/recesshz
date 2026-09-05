@@ -696,3 +696,23 @@ export function applyWordScrambleGuess(
     over: winner !== null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Counters Ball FC — bottle-cap table football (async flicks).
+// Full physics lives in src/lib/countersBall/; re-exported here for catalog parity.
+// ---------------------------------------------------------------------------
+
+export {
+  COUNTERS_BALL_GAME_TYPE,
+  freshCountersBallState,
+  runToRest as runCountersBallToRest,
+  canFlick as canCountersBallFlick,
+  CB as COUNTERS_BALL_CONSTANTS,
+  PITCH as COUNTERS_BALL_PITCH,
+} from "@/lib/countersBall";
+export type {
+  CountersBallState,
+  Impulse as CountersBallImpulse,
+  RosterSize as CountersBallRosterSize,
+  TeamId as CountersBallTeamId,
+} from "@/lib/countersBall";
