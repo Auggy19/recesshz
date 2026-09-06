@@ -6,17 +6,19 @@ import {
 import {
   RPS_GAME_TYPE, RED_BLACK_GAME_TYPE, PONG_GAME_TYPE,
   TWENTY_QUESTIONS_GAME_TYPE, HANGMAN_GAME_TYPE, WORD_SCRAMBLE_GAME_TYPE,
+  COUNTERS_BALL_GAME_TYPE,
   applyTicTacToeMove, applyRpsPick, applyRedBlackGuess, applyPongServe, applyPongReturn,
   applyTwentyQuestionsSecret, applyTwentyQuestionsQuestion, applyTwentyQuestionsAnswer,
   applyTwentyQuestionsGuess, applyHangmanSecret, applyHangmanGuess,
   applyWordScrambleSecret, applyWordScrambleGuess, coinFlip, hasDistinctLetters,
+  runCountersBallToRest, canCountersBallFlick,
   RPS_CHOICES, RED_BLACK_CHOICES, PONG_POWERS, PONG_SERVE_ANGLE, PONG_RETURN_ANGLE,
   MAX_QUESTIONS, HANGMAN_SECRET_MAX, HANGMAN_GUESS_MAX,
   SCRAMBLE_SECRET_MIN, SCRAMBLE_SECRET_MAX, SCRAMBLE_GUESS_MAX,
   type Marker as LogicMarker, type RpsChoice, type RedBlackChoice, type PongPower,
   type RpsState, type RedBlackState, type PongState, type TwentyQuestionsState,
   type HangmanState, type WordScrambleState, type YesNo,
-  type TicTacToeState,
+  type TicTacToeState, type CountersBallState,
 } from "@/lib/gameLogic";
 
 const HANGMAN_RE = /^[A-Za-z][A-Za-z\s'-]*$/;
@@ -26,10 +28,12 @@ export type SubmitMoveArgs = {
   slug: string; deviceToken: string; cell?: number; pick?: string;
   angle?: number; power?: number; secret?: string; question?: string;
   answer?: "yes" | "no"; guess?: string;
+  /** Counters Ball FC impulse */
+  capId?: string; ix?: number; iy?: number; spin?: number;
 };
 
 export async function submitMove(args: SubmitMoveArgs) {
-  const { slug, deviceToken, cell, pick, angle, power, secret, question, answer, guess } = args;
+  const { slug, deviceToken, cell, pick, angle, power, secret, question, answer, guess, capId, ix, iy, spin } = args;
   const game = await getGameBySlug(slug);
   if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
   if (await expireIfStale(game)) fail("expired", "This game sat untouched for 48 hours, so it was closed.");
@@ -160,6 +164,31 @@ export async function submitMove(args: SubmitMoveArgs) {
       const o = applyWordScrambleGuess(state, g);
       newState = o.state; over = o.over; payload = { type: "answer", guess: g, marker };
     }
+  } else if (gt === COUNTERS_BALL_GAME_TYPE) {
+    const state = game.state as CountersBallState;
+    if (state.phase === "gameover" || state.winner !== null) {
+      fail("invalid_move", "This match is already over.");
+    }
+    if (typeof capId !== "string" || !capId) {
+      fail("invalid_move", "Pick one of your caps to flick.");
+    }
+    if (typeof ix !== "number" || typeof iy !== "number" || !Number.isFinite(ix) || !Number.isFinite(iy)) {
+      fail("invalid_move", "That flick isn't valid.");
+    }
+    const team = marker === "X" ? 0 : 1;
+    if (!canCountersBallFlick(state, team, capId)) {
+      fail("invalid_move", "It's not your turn, or that isn't your cap.");
+    }
+    const impulse = {
+      capId,
+      ix,
+      iy,
+      spin: typeof spin === "number" && Number.isFinite(spin) ? spin : undefined,
+    };
+    const result = runCountersBallToRest(state, impulse);
+    newState = result.state;
+    over = result.state.phase === "gameover" || result.state.winner !== null;
+    payload = { type: "flick", capId, ix, iy, spin: impulse.spin ?? null, marker, events: result.events };
   } else {
     const state = game.state as TicTacToeState;
     if (typeof cell !== "number" || !Number.isInteger(cell) || cell < 0 || cell > 8) {
