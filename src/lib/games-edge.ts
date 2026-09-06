@@ -68,6 +68,11 @@ export type SubmitMoveArgs = {
   question?: string;
   answer?: "yes" | "no";
   guess?: string;
+  /** Counters Ball FC */
+  capId?: string;
+  ix?: number;
+  iy?: number;
+  spin?: number;
 };
 
 export async function submitMove(args: SubmitMoveArgs) {
