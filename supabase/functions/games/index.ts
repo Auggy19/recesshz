@@ -23,6 +23,11 @@ import {
   freshCountersBallState,
 } from "../_shared/countersBall/index.ts";
 import { getIceServers, finalizeLiveMatch as finalizeLiveMatchAction } from "./live-actions.ts";
+import {
+  submitMoveAction,
+  playAgainAction,
+  submitFeedbackAction,
+} from "./submit-actions.ts";
 
 const EXPIRY_MS = 48 * 60 * 60 * 1000;
 const ROOM_RE = /^[A-Za-z0-9_-]{3,64}$/;
@@ -214,15 +219,15 @@ async function getGameState(db: SupabaseClient, body: Record<string, unknown>) {
 }
 
 async function submitMove(db: SupabaseClient, body: Record<string, unknown>) {
-  fail("not_ready", "Edge Function partially restored — redeploy from commit 968e08c + live-actions.");
+  return submitMoveAction(db, body, { fail, getGameBySlug, getPlayer, expireIfStale, maskState });
 }
 
 async function playAgain(db: SupabaseClient, body: Record<string, unknown>) {
-  fail("not_ready", "Edge Function partially restored — redeploy from commit 968e08c + live-actions.");
+  return playAgainAction(db, body, { fail, getGameBySlug, getPlayer, freshStateFor });
 }
 
 async function submitFeedback(db: SupabaseClient, body: Record<string, unknown>) {
-  fail("not_ready", "Edge Function partially restored — redeploy from commit 968e08c + live-actions.");
+  return submitFeedbackAction(db, body, { fail, getGameBySlug, getPlayer });
 }
 
 Deno.serve(async (req) => {
