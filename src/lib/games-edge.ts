@@ -1,7 +1,38 @@
 import { supabase, requireSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { ApiError, type ErrorCode } from "@/lib/api-error";
+import { createGame as createGameClient } from "@/lib/games-create";
 
 type EdgeError = { code?: string; message?: string };
+
+async function extractEdgeError(error: unknown): Promise<{
+  code: ErrorCode;
+  message: string;
+}> {
+  let code: ErrorCode = "not_ready";
+  let message =
+    (error as { message?: string })?.message ||
+    "Couldn't reach the game server. Deploy the `games` Edge Function, then try again.";
+
+  try {
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") {
+      const body = (await ctx.json()) as { error?: EdgeError; message?: string };
+      if (body?.error?.message) message = String(body.error.message);
+      else if (body?.message) message = String(body.message);
+      if (body?.error?.code) code = body.error.code as ErrorCode;
+    }
+  } catch {
+    /* keep defaults */
+  }
+
+  // Supabase client often only says "non-2xx" — surface something actionable.
+  if (/non-2xx/i.test(message)) {
+    message =
+      "Game server rejected the request (Edge non-2xx). If you just added a game, redeploy: supabase functions deploy games --no-verify-jwt";
+  }
+
+  return { code, message };
+}
 
 async function invokeGames<T>(
   action: string,
@@ -13,11 +44,8 @@ async function invokeGames<T>(
   });
 
   if (error) {
-    throw new ApiError(
-      "not_ready",
-      error.message ||
-        "Couldn't reach the game server. Deploy the `games` Edge Function, then try again.",
-    );
+    const parsed = await extractEdgeError(error);
+    throw new ApiError(parsed.code, parsed.message);
   }
 
   const payload = data as T & { error?: EdgeError };
@@ -34,7 +62,28 @@ export async function createGame(args: {
   deviceToken: string;
   slug?: string;
 }) {
-  return invokeGames<{ slug: string }>("createGame", args);
+  try {
+    return await invokeGames<{ slug: string }>("createGame", args);
+  } catch (err) {
+    // Production Edge may lag behind GitHub (unsupported_game / non-2xx).
+    // Client path uses the same schema + open RLS and already supports counters_ball.
+    const code = err instanceof ApiError ? err.code : "";
+    const msg = err instanceof Error ? err.message : "";
+    const shouldFallback =
+      code === "unsupported_game" ||
+      code === "not_ready" ||
+      /non-2xx|isn't available yet|redeploy/i.test(msg);
+
+    if (shouldFallback) {
+      try {
+        return await createGameClient(args);
+      } catch (clientErr) {
+        // Prefer the more specific client error if Edge was only "unsupported".
+        throw clientErr;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function joinGame(args: { slug: string; deviceToken: string }) {
