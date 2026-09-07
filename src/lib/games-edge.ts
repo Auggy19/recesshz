@@ -159,18 +159,70 @@ export async function finalizeLiveMatch(args: {
   return invokeGames<{ ok: boolean; status: string }>("finalizeLiveMatch", args);
 }
 
+/** Realtime channel lifecycle for debug HUD + recovery. */
+export type RealtimeStatus =
+  | "idle"
+  | "connecting"
+  | "subscribed"
+  | "channel_error"
+  | "timed_out"
+  | "closed";
+
+export type RealtimeSubscribeOptions = {
+  /** Called on every postgres_changes payload. */
+  onEvent?: (info: { eventType: string; at: number }) => void;
+  /** Channel status: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED, … */
+  onStatus?: (status: RealtimeStatus, detail?: string) => void;
+};
+
+function mapRealtimeStatus(raw: string): RealtimeStatus {
+  switch (raw) {
+    case "SUBSCRIBED":
+      return "subscribed";
+    case "CHANNEL_ERROR":
+      return "channel_error";
+    case "TIMED_OUT":
+      return "timed_out";
+    case "CLOSED":
+      return "closed";
+    default:
+      return "connecting";
+  }
+}
+
 /** Realtime stays on the client — no Edge Function needed. */
-export function subscribeGame(slug: string, onChange: () => void): () => void {
-  if (!isSupabaseConfigured) return () => {};
+export function subscribeGame(
+  slug: string,
+  onChange: () => void,
+  options?: RealtimeSubscribeOptions,
+): () => void {
+  if (!isSupabaseConfigured) {
+    options?.onStatus?.("idle", "supabase not configured");
+    return () => {};
+  }
+
+  options?.onStatus?.("connecting");
+
   const channel = supabase
     .channel(`game:${slug}`)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "games", filter: `slug=eq.${slug}` },
-      () => onChange(),
+      (payload) => {
+        const at = Date.now();
+        const eventType = String(payload.eventType ?? "CHANGE");
+        options?.onEvent?.({ eventType, at });
+        onChange();
+      },
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      const mapped = mapRealtimeStatus(status);
+      const detail = err ? String((err as Error).message ?? err) : status;
+      options?.onStatus?.(mapped, detail);
+    });
+
   return () => {
+    options?.onStatus?.("closed", "unsubscribed");
     void supabase.removeChannel(channel);
   };
 }
