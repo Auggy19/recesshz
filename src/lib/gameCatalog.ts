@@ -21,6 +21,7 @@ import {
   freshWordScrambleState,
   freshCountersBallState,
 } from "@/lib/gameLogic";
+import { TRUTH_OR_DARE_GAME_TYPE, freshTruthOrDareState } from "@/lib/truthOrDare";
 
 export type SupportedGameType =
   | typeof GAME_TYPE
@@ -30,7 +31,8 @@ export type SupportedGameType =
   | typeof TWENTY_QUESTIONS_GAME_TYPE
   | typeof HANGMAN_GAME_TYPE
   | typeof WORD_SCRAMBLE_GAME_TYPE
-  | typeof COUNTERS_BALL_GAME_TYPE;
+  | typeof COUNTERS_BALL_GAME_TYPE
+  | typeof TRUTH_OR_DARE_GAME_TYPE;
 
 /** Visual token for cards, chips, and icons. */
 export type GameAccent =
@@ -51,7 +53,8 @@ export type GameIconId =
   | "gallows"
   | "scramble"
   | "ball"
-  | "spark";
+  | "spark"
+  | "flame";
 
 export type GameCatalogEntry = {
   type: SupportedGameType;
@@ -162,6 +165,18 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     supportsLive: false,
     available: true,
   },
+  {
+    type: TRUTH_OR_DARE_GAME_TYPE,
+    slug: "truth-or-dare",
+    name: "Truth or Dare",
+    shortName: "T or D",
+    blurb:
+      "You pick truth or dare for your friend. They complete it or skip. First to five completions wins — share the link and take turns when you can.",
+    icon: "flame",
+    accent: "rose",
+    supportsLive: false,
+    available: true,
+  },
 ] as const;
 
 export const AVAILABLE_GAMES = GAME_CATALOG.filter((g) => g.available);
@@ -201,6 +216,10 @@ export function urlGameToType(raw: string | null): SupportedGameType | null {
     case "counters":
     case "countersball":
       return COUNTERS_BALL_GAME_TYPE;
+    case "tod":
+    case "truth-or-dare":
+    case "truth_or_dare":
+      return TRUTH_OR_DARE_GAME_TYPE;
     default:
       return null;
   }
@@ -228,6 +247,8 @@ export function freshStateFor(gameType: string): unknown {
       return freshHangmanState();
     case WORD_SCRAMBLE_GAME_TYPE:
       return freshWordScrambleState();
+    case TRUTH_OR_DARE_GAME_TYPE:
+      return freshTruthOrDareState();
     default:
       return null;
   }
