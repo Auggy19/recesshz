@@ -20,6 +20,12 @@ import {
   runToRest as runCountersBallToRest,
   type CountersBallState,
 } from "../_shared/countersBall/index.ts";
+import {
+  TRUTH_OR_DARE_GAME_TYPE,
+  applyTruthOrDareMove,
+  type TodKind,
+  type TodState,
+} from "../_shared/truthOrDare.ts";
 
 const HANGMAN_RE = /^[A-Za-z][A-Za-z\s'-]*$/;
 const SCRAMBLE_RE = /^[A-Za-z]{3,12}$/;
@@ -57,6 +63,8 @@ export async function submitMoveAction(
   const ix = body.ix as number | undefined;
   const iy = body.iy as number | undefined;
   const spin = body.spin as number | undefined;
+  const todAction = body.todAction as string | undefined;
+  const todKind = body.kind as TodKind | undefined;
 
   const game = await getGameBySlug(db, slug);
   if (!game) fail("not_found", "This game doesn't exist (or the link is wrong).");
@@ -219,6 +227,39 @@ export async function submitMoveAction(
       marker,
       events: result.events,
     };
+  } else if (gt === TRUTH_OR_DARE_GAME_TYPE) {
+    const state = game.state as TodState;
+    if (state.phase === "match_over" || state.matchWinner) {
+      fail("invalid_move", "This match is already over.");
+    }
+    let move;
+    if (todAction === "choose") {
+      if (todKind !== "truth" && todKind !== "dare") {
+        fail("invalid_move", "Pick truth or dare.");
+      }
+      move = { action: "choose" as const, kind: todKind };
+    } else if (todAction === "done") {
+      move = { action: "done" as const };
+    } else if (todAction === "skip") {
+      move = { action: "skip" as const };
+    } else {
+      fail("invalid_move", "Unknown Truth or Dare action.");
+    }
+    const salt = Date.now() ^ (game.id ? String(game.id).length * 9973 : 0);
+    const o = applyTruthOrDareMove(state, marker, move, salt);
+    if (
+      o.state.phase === state.phase &&
+      o.state.turn === state.turn &&
+      o.state.subject === state.subject &&
+      o.state.scores.X === state.scores.X &&
+      o.state.scores.O === state.scores.O &&
+      !o.over
+    ) {
+      fail("invalid_move", "It's not your turn for that action.");
+    }
+    newState = o.state;
+    over = o.over;
+    payload = { type: "tod", todAction, kind: todKind ?? null, marker };
   } else {
     const state = game.state as TicTacToeState;
     if (typeof cell !== "number" || !Number.isInteger(cell) || cell < 0 || cell > 8) {
