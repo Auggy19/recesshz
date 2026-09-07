@@ -17,6 +17,8 @@ import WordScramblePlay, {
 } from "@/components/games/WordScramblePlay";
 import CountersBallPlay from "@/components/games/CountersBallPlay";
 import type { CountersBallState } from "@/lib/countersBall";
+import TruthOrDarePlay from "@/components/games/TruthOrDarePlay";
+import type { TodKind, TodState } from "@/lib/truthOrDare";
 
 type GameStatus = "waiting" | "in_progress" | "completed" | "abandoned";
 
@@ -32,6 +34,7 @@ type Props = {
   onTq: (move: TwentyQuestionsMove) => void;
   onHangman: (move: HangmanMove) => void;
   onScramble: (move: WordScrambleMove) => void;
+  onTod?: (move: { action: "choose"; kind: TodKind } | { action: "done" } | { action: "skip" }) => void;
   liveConnected?: boolean;
   remoteAim?: number | null;
   onAimChange?: (angle: number) => void;
@@ -49,6 +52,7 @@ export function GamePlayRouter({
   onTq,
   onHangman,
   onScramble,
+  onTod,
   liveConnected,
   remoteAim,
   onAimChange,
@@ -117,6 +121,18 @@ export function GamePlayRouter({
       />
     );
   }
+  if (gameType === "truth_or_dare") {
+    return (
+      <TruthOrDarePlay
+        state={state as TodState}
+        status={status}
+        myMarker={myMarker}
+        onChoose={(kind) => onTod?.({ action: "choose", kind })}
+        onDone={() => onTod?.({ action: "done" })}
+        onSkip={() => onTod?.({ action: "skip" })}
+      />
+    );
+  }
   if (gameType === "counters_ball") {
     return (
       <CountersBallPlay
@@ -142,7 +158,12 @@ export function isGameOver(gameType: string, state: unknown): boolean {
   if (gameType === "counters_ball") {
     return s.phase === "gameover" || s.winner != null;
   }
-  if (gameType === "rock_paper_scissors" || gameType === "red_or_black" || gameType === "pong") {
+  if (
+    gameType === "rock_paper_scissors" ||
+    gameType === "red_or_black" ||
+    gameType === "pong" ||
+    gameType === "truth_or_dare"
+  ) {
     return s.matchWinner != null;
   }
   if (
@@ -167,7 +188,12 @@ export function celebrationFor(
     if (s.winner == null) return "draw";
     return s.winner === myTeam ? "win" : "loss";
   }
-  if (gameType === "rock_paper_scissors" || gameType === "red_or_black" || gameType === "pong") {
+  if (
+    gameType === "rock_paper_scissors" ||
+    gameType === "red_or_black" ||
+    gameType === "pong" ||
+    gameType === "truth_or_dare"
+  ) {
     const w = s.matchWinner as Marker | null;
     if (!w) return "draw";
     return w === myMarker ? "win" : "loss";
