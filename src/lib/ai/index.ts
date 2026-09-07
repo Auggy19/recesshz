@@ -54,6 +54,7 @@ export const SINGLE_PLAYER_GAMES = [
   "rock_paper_scissors",
   "red_or_black",
   "pong",
+  "truth_or_dare",
 ] as const;
 
 export type SinglePlayerGame = (typeof SINGLE_PLAYER_GAMES)[number];
