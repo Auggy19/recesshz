@@ -25,7 +25,6 @@ async function extractEdgeError(error: unknown): Promise<{
     /* keep defaults */
   }
 
-  // Supabase client often only says "non-2xx" — surface something actionable.
   if (/non-2xx/i.test(message)) {
     message =
       "Game server rejected the request (Edge non-2xx). If you just added a game, redeploy: supabase functions deploy games --no-verify-jwt";
@@ -65,8 +64,6 @@ export async function createGame(args: {
   try {
     return await invokeGames<{ slug: string }>("createGame", args);
   } catch (err) {
-    // Production Edge may lag behind GitHub (unsupported_game / non-2xx).
-    // Client path uses the same schema + open RLS and already supports counters_ball.
     const code = err instanceof ApiError ? err.code : "";
     const msg = err instanceof Error ? err.message : "";
     const shouldFallback =
@@ -78,7 +75,6 @@ export async function createGame(args: {
       try {
         return await createGameClient(args);
       } catch (clientErr) {
-        // Prefer the more specific client error if Edge was only "unsupported".
         throw clientErr;
       }
     }
@@ -122,6 +118,9 @@ export type SubmitMoveArgs = {
   ix?: number;
   iy?: number;
   spin?: number;
+  /** Truth or Dare */
+  todAction?: "choose" | "done" | "skip";
+  kind?: "truth" | "dare";
 };
 
 export async function submitMove(args: SubmitMoveArgs) {
@@ -141,15 +140,10 @@ export async function submitFeedback(args: {
   return invokeGames<{ ok: boolean }>("submitFeedback", args);
 }
 
-/** ICE servers for live WebRTC (STUN + optional TURN from Edge secrets). */
 export async function getIceServers() {
   return invokeGames<{ iceServers: RTCIceServer[] }>("getIceServers", {});
 }
 
-/**
- * Authoritative live match end: forfeit or agreed completion.
- * Does not trust peer scores for ranked fairness beyond forfeit.
- */
 export async function finalizeLiveMatch(args: {
   slug: string;
   deviceToken: string;
@@ -159,7 +153,6 @@ export async function finalizeLiveMatch(args: {
   return invokeGames<{ ok: boolean; status: string }>("finalizeLiveMatch", args);
 }
 
-/** Realtime channel lifecycle for debug HUD + recovery. */
 export type RealtimeStatus =
   | "idle"
   | "connecting"
@@ -169,9 +162,7 @@ export type RealtimeStatus =
   | "closed";
 
 export type RealtimeSubscribeOptions = {
-  /** Called on every postgres_changes payload. */
   onEvent?: (info: { eventType: string; at: number }) => void;
-  /** Channel status: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED, … */
   onStatus?: (status: RealtimeStatus, detail?: string) => void;
 };
 
@@ -190,7 +181,6 @@ function mapRealtimeStatus(raw: string): RealtimeStatus {
   }
 }
 
-/** Realtime stays on the client — no Edge Function needed. */
 export function subscribeGame(
   slug: string,
   onChange: () => void,
