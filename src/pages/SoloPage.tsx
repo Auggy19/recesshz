@@ -20,6 +20,7 @@ import type { RpsChoice, RedBlackChoice } from "@/lib/gameLogic";
 import { AdSlot } from "@/components/AdSlot";
 import { CelebrationOverlay } from "@/components/CelebrationOverlay";
 import { ArcadePong } from "@/components/games/ArcadePong";
+import { SoloTruthOrDare } from "@/components/games/SoloTruthOrDare";
 
 export default function SoloPage() {
   const { gameType = "tic_tac_toe" } = useParams<{ gameType: string }>();
@@ -33,7 +34,8 @@ export default function SoloPage() {
   const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
   const [soundOn, setSoundOn] = useState(() => !isSfxMuted());
 
-  const supported = supportsSinglePlayer(gameType);
+  const isTod = gameType === "truth_or_dare" || gameType === "truth-or-dare";
+  const supported = supportsSinglePlayer(gameType) || isTod;
   const ttt = useSinglePlayerTicTacToe(difficulty);
   const rps = useSinglePlayerRps(difficulty);
   const rb = useSinglePlayerRedBlack(difficulty);
@@ -77,8 +79,9 @@ export default function SoloPage() {
     if (gameType === "pong") {
       return "Arcade Pong · first to 7";
     }
+    if (isTod) return "Pass the phone · no score kept";
     return null;
-  }, [gameType, ttt, rps, rb]);
+  }, [gameType, ttt, rps, rb, isTod]);
 
   const onReset = () => {
     if (gameType === "tic_tac_toe") ttt.reset();
@@ -121,41 +124,47 @@ export default function SoloPage() {
           <GameIcon gameType={gameType} size="md" />
           <div>
             <h1 className="font-display text-2xl font-black tracking-tight">{title}</h1>
-            <p className="text-sm text-muted-foreground">Solo · vs AI</p>
+            <p className="text-sm text-muted-foreground">
+              {isTod ? "Solo · pass the phone" : "Solo · vs AI"}
+            </p>
           </div>
         </div>
 
         {!supported ? (
           <p className="mt-8 rounded-2xl border border-dashed border-border bg-card/60 p-5 text-sm text-muted-foreground">
-            Solo mode isn&apos;t available for this game yet. Try Tic Tac Toe, RPS, Red or Black, or Pong.
+            Solo mode isn't available for this game yet. Try Tic Tac Toe, RPS, Red or Black, Pong, or Truth or Dare.
           </p>
         ) : (
           <>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => {
-                    setDifficulty(d);
-                    onReset();
-                  }}
-                  className={cn(
-                    "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
-                    difficulty === d
-                      ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
-                      : "border border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {DIFFICULTY_LABELS[d]}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">{DIFFICULTY_BLURBS[difficulty]}</p>
+            {!isTod && (
+              <>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        setDifficulty(d);
+                        onReset();
+                      }}
+                      className={cn(
+                        "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all",
+                        difficulty === d
+                          ? "bg-gradient-to-b from-primary to-primary-deep text-white shadow-btn-amber"
+                          : "border border-border text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {DIFFICULTY_LABELS[d]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{DIFFICULTY_BLURBS[difficulty]}</p>
+              </>
+            )}
 
             <div className="mt-6 mb-2 flex items-center justify-between text-sm font-semibold">
               <span>{status}</span>
-              {gameType !== "pong" && (
+              {gameType !== "pong" && !isTod && (
                 <button
                   type="button"
                   onClick={onReset}
@@ -246,6 +255,8 @@ export default function SoloPage() {
             {gameType === "pong" && (
               <ArcadePong key={difficulty} difficulty={difficulty} />
             )}
+
+            {isTod && <SoloTruthOrDare />}
 
             <div className="mt-10">
               <AdSlot slot="post_match" gameType={gameType} />
