@@ -14,4 +14,8 @@ export {
   getIceServers,
   finalizeLiveMatch,
 } from "@/lib/games-edge";
-export type { SubmitMoveArgs } from "@/lib/games-edge";
+export type {
+  SubmitMoveArgs,
+  RealtimeStatus,
+  RealtimeSubscribeOptions,
+} from "@/lib/games-edge";
