@@ -22,6 +22,10 @@ import {
   COUNTERS_BALL_GAME_TYPE,
   freshCountersBallState,
 } from "../_shared/countersBall/index.ts";
+import {
+  TRUTH_OR_DARE_GAME_TYPE,
+  freshTruthOrDareState,
+} from "../_shared/truthOrDare.ts";
 import { getIceServers, finalizeLiveMatch as finalizeLiveMatchAction } from "./live-actions.ts";
 import {
   submitMoveAction,
@@ -37,6 +41,7 @@ const SUPPORTED = new Set([
   GAME_TYPE, RPS_GAME_TYPE, RED_BLACK_GAME_TYPE, PONG_GAME_TYPE,
   TWENTY_QUESTIONS_GAME_TYPE, HANGMAN_GAME_TYPE, WORD_SCRAMBLE_GAME_TYPE,
   COUNTERS_BALL_GAME_TYPE,
+  TRUTH_OR_DARE_GAME_TYPE,
 ]);
 
 type ErrCode =
@@ -71,6 +76,7 @@ function freshStateFor(gameType: string): unknown {
     case TWENTY_QUESTIONS_GAME_TYPE: return freshTwentyQuestionsState();
     case HANGMAN_GAME_TYPE: return freshHangmanState();
     case WORD_SCRAMBLE_GAME_TYPE: return freshWordScrambleState();
+    case TRUTH_OR_DARE_GAME_TYPE: return freshTruthOrDareState();
     default: fail("unsupported_game", `Unknown game type "${gameType}".`);
   }
 }
