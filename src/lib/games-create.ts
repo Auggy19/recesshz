@@ -24,6 +24,10 @@ import {
   type HangmanState,
   type WordScrambleState,
 } from "@/lib/gameLogic";
+import {
+  TRUTH_OR_DARE_GAME_TYPE,
+  freshTruthOrDareState,
+} from "@/lib/truthOrDare";
 
 export const EXPIRY_MS = 48 * 60 * 60 * 1000;
 const ROOM_RE = /^[A-Za-z0-9_-]{3,64}$/;
@@ -36,6 +40,7 @@ const SUPPORTED: Set<string> = new Set([
   HANGMAN_GAME_TYPE,
   WORD_SCRAMBLE_GAME_TYPE,
   COUNTERS_BALL_GAME_TYPE,
+  TRUTH_OR_DARE_GAME_TYPE,
 ]);
 
 export function fail(code: ApiError["code"], message: string): never {
@@ -60,6 +65,8 @@ export function freshStateFor(gameType: string): unknown {
       return freshHangmanState();
     case WORD_SCRAMBLE_GAME_TYPE:
       return freshWordScrambleState();
+    case TRUTH_OR_DARE_GAME_TYPE:
+      return freshTruthOrDareState();
     default:
       fail("unsupported_game", `Unknown game type "${gameType}".`);
   }
