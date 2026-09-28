@@ -4,6 +4,15 @@ import { createGame as createGameClient } from "@/lib/games-create";
 
 type EdgeError = { code?: string; message?: string };
 
+const BACKEND_DOWN_MSG =
+  "Can't reach the game server. Open Supabase → your project → Restore/Unpause if it's paused, confirm VITE_SUPABASE_URL still matches, then try again.";
+
+function looksLikeNetworkFailure(message: string): boolean {
+  return /failed to fetch|networkerror|load failed|network request failed|err_name_not_resolved|err_connection|cors/i.test(
+    message,
+  );
+}
+
 async function extractEdgeError(error: unknown): Promise<{
   code: ErrorCode;
   message: string;
@@ -28,6 +37,8 @@ async function extractEdgeError(error: unknown): Promise<{
   if (/non-2xx/i.test(message)) {
     message =
       "Game server rejected the request (Edge non-2xx). If you just added a game, redeploy: supabase functions deploy games --no-verify-jwt";
+  } else if (looksLikeNetworkFailure(message)) {
+    message = BACKEND_DOWN_MSG;
   }
 
   return { code, message };
@@ -38,9 +49,21 @@ async function invokeGames<T>(
   body: Record<string, unknown>,
 ): Promise<T> {
   requireSupabase();
-  const { data, error } = await supabase.functions.invoke("games", {
-    body: { action, ...body },
-  });
+  let data: unknown;
+  let error: unknown;
+  try {
+    const res = await supabase.functions.invoke("games", {
+      body: { action, ...body },
+    });
+    data = res.data;
+    error = res.error;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (looksLikeNetworkFailure(msg)) {
+      throw new ApiError("not_ready", BACKEND_DOWN_MSG);
+    }
+    throw err;
+  }
 
   if (error) {
     const parsed = await extractEdgeError(error);
@@ -66,15 +89,19 @@ export async function createGame(args: {
   } catch (err) {
     const code = err instanceof ApiError ? err.code : "";
     const msg = err instanceof Error ? err.message : "";
+    // Only fall back for "game type not on Edge yet" — not when the whole backend is down.
     const shouldFallback =
       code === "unsupported_game" ||
-      code === "not_ready" ||
-      /non-2xx|isn't available yet|redeploy/i.test(msg);
+      (/isn't available yet|unsupported/i.test(msg) && !looksLikeNetworkFailure(msg));
 
     if (shouldFallback) {
       try {
         return await createGameClient(args);
       } catch (clientErr) {
+        const cmsg = clientErr instanceof Error ? clientErr.message : String(clientErr);
+        if (looksLikeNetworkFailure(cmsg)) {
+          throw new ApiError("not_ready", BACKEND_DOWN_MSG);
+        }
         throw clientErr;
       }
     }
