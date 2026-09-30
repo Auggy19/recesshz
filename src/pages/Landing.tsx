@@ -2,16 +2,16 @@ import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
 import { createGame } from "@/lib/games-api";
 import { getApiError } from "@/lib/api-error";
+import { parseRoomInput } from "@/lib/roomCode";
+import { incrementGuestRounds, shouldPromptAccount } from "@/lib/guestPlay";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
   Flame,
   Gamepad2,
-  Link2,
   Loader2,
   LogIn,
   MessageCircle,
-  Sparkles,
   Bot,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -25,11 +25,9 @@ import { Button } from "@/components/ui/button";
 import { applyOgMeta, resolveOgMeta } from "@/lib/og";
 import {
   HangmanArt,
-  HeroArt,
   PongArt,
   RedOrBlackArt,
   RockPaperScissorsArt,
-  SwingSetArt,
   TicTacToeArt,
   TwentyQuestionsArt,
   WordScrambleArt,
@@ -37,11 +35,7 @@ import {
 import { GameIcon, GameChip } from "@/components/GameIcon";
 import { SoloLaunch } from "@/components/SoloLaunch";
 import { supportsSinglePlayer } from "@/lib/ai";
-import {
-  AVAILABLE_GAMES,
-  urlGameToType,
-  type SupportedGameType,
-} from "@/lib/gameCatalog";
+import { AVAILABLE_GAMES } from "@/lib/gameCatalog";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -79,18 +73,15 @@ export default function Landing() {
   const { streak } = useStreak();
   const [creating, setCreating] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState("");
-  const [roomGame, setRoomGame] = useState<SupportedGameType>("tic_tac_toe");
+  const [showAccountNudge, setShowAccountNudge] = useState(false);
   const roomJoinedRef = useRef(false);
 
-  const handleCreateGame = async (gameType: string, roomSlug?: string) => {
+  const handleCreateGame = async (gameType: string) => {
     if (creating) return;
     setCreating(gameType);
     try {
-      const { slug } = await createGame({
-        gameType,
-        deviceToken,
-        ...(roomSlug ? { slug: roomSlug } : {}),
-      });
+      const { slug } = await createGame({ gameType, deviceToken });
+      incrementGuestRounds();
       navigate(`/play/${slug}`);
     } catch (err) {
       toast.error(getApiError(err).message ?? "Could not start that game");
@@ -101,28 +92,28 @@ export default function Landing() {
 
   const handleJoinRoom = (e: FormEvent) => {
     e.preventDefault();
-    const code = roomCode.trim();
-    if (!code) {
-      toast.error("Enter a room code");
+    const slug = parseRoomInput(roomCode);
+    if (!slug) {
+      toast.error("Paste a Recess link or a room code (at least 3 characters).");
       return;
     }
-    void handleCreateGame(roomGame, code);
+    navigate(`/play/${slug}`);
   };
 
   useEffect(() => {
     applyOgMeta(resolveOgMeta("/" ));
+    setShowAccountNudge(shouldPromptAccount());
   }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const join = params.get("join") || params.get("room");
-    const game = params.get("game");
     if (join && !roomJoinedRef.current) {
       roomJoinedRef.current = true;
-      const type = urlGameToType(game) ?? "tic_tac_toe";
-      void handleCreateGame(type, join);
+      const slug = parseRoomInput(join);
+      if (slug) navigate(`/play/${slug}`);
     }
-  }, [deviceToken]);
+  }, [deviceToken, navigate]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -134,9 +125,24 @@ export default function Landing() {
               <Flame className="size-3.5" /> {streak}
             </span>
           )}
+          <Link to="/auth" className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+            Sign in
+          </Link>
           <ThemeToggle />
         </div>
       </header>
+
+      {showAccountNudge && (
+        <div className="mx-auto w-full max-w-5xl px-5">
+          <div className="rounded-2xl border border-primary/30 bg-card px-4 py-3 text-sm shadow-soft">
+            You have had a few games on this phone. Save the streak —{" "}
+            <Link to="/auth" className="font-bold text-primary underline-offset-2 hover:underline">
+              create a free account
+            </Link>
+            . Play still works either way.
+          </div>
+        </div>
+      )}
 
       <section className="mx-auto w-full max-w-5xl px-5 pb-10 pt-4">
         <motion.div {...fadeUp} transition={{ duration: 0.35 }} className="text-center">
@@ -213,11 +219,7 @@ export default function Landing() {
                       variant="outline"
                       className="rounded-full font-bold"
                       onClick={() =>
-                        navigate(
-                          g.type === "pong"
-                            ? "/solo/pong?difficulty=intermediate"
-                            : `/solo/${g.type}?difficulty=intermediate`,
-                        )
+                        navigate(`/solo/${g.type}?difficulty=intermediate`)
                       }
                     >
                       Solo
@@ -239,16 +241,17 @@ export default function Landing() {
           className="flex flex-col gap-2 rounded-3xl border border-border bg-card p-4 shadow-soft sm:flex-row sm:items-end"
         >
           <label className="flex-1 text-left text-xs font-semibold text-muted-foreground">
-            Room code
+            Room code or link
             <input
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
               className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-              placeholder="Paste code or link slug"
+              placeholder="Paste /play/… link or room code"
               autoComplete="off"
+              inputMode="text"
             />
           </label>
-          <Button type="submit" className="rounded-full font-bold" disabled={!!creating}>
+          <Button type="submit" className="rounded-full font-bold">
             <LogIn className="size-4" />
             Join
           </Button>
@@ -295,7 +298,7 @@ export default function Landing() {
               onClick={open}
               className="mt-1 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-muted-foreground shadow-chip transition-colors hover:text-foreground"
             >
-              📲 Add Recess to Home Screen
+              Add Recess to Home Screen
             </button>
           )}
         />
