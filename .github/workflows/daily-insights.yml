@@ -1,0 +1,16 @@
+name: Daily Recess insights reminder
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Insight checklist
+        run: |
+          echo "Run docs/DAILY_INSIGHTS.sql in the Supabase SQL editor (project must be Active)."
+          echo "Look at: rooms created vs completed, abandon rate, would-play-again."
+          echo "Propose one UI change if abandon > 40% or a game has near-zero creates."
