@@ -20,13 +20,6 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function getSystemTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
 function getStoredTheme(): Theme | null {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -36,29 +29,11 @@ function getStoredTheme(): Theme | null {
   }
 }
 
-/**
- * Theme handling for Recess:
- * - Defaults to the user's current OS theme (prefers-color-scheme).
- * - If the user explicitly picks a theme, that choice is persisted and wins.
- * - Applies the Tailwind `dark` class + `color-scheme` on <html>.
- * - A tiny inline script in index.html applies the same logic before paint
- *   so there's no flash of the wrong theme.
- */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return getStoredTheme() ?? getSystemTheme();
+    return getStoredTheme() ?? "dark";
   });
 
-  // Follow the OS when the user hasn't chosen an explicit theme yet.
-  useEffect(() => {
-    if (getStoredTheme() !== null) return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setThemeState(mq.matches ? "dark" : "light");
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
-  // Apply the theme to the document root.
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
@@ -66,7 +41,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      meta.setAttribute("content", theme === "dark" ? "#17130C" : "#F5A623");
+      meta.setAttribute("content", theme === "dark" ? "#070707" : "#F5A623");
     }
   }, [theme]);
 
@@ -74,7 +49,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      // Ignore storage failures (private mode etc.) — theme still applies.
+      /* ignore */
     }
     setThemeState(next);
   }, []);
@@ -85,7 +60,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       try {
         window.localStorage.setItem(STORAGE_KEY, next);
       } catch {
-        // ignore
+        /* ignore */
       }
       return next;
     });
