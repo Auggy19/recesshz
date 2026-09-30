@@ -14,6 +14,7 @@ import type { RealtimeStatus } from "@/lib/games-api";
 import { CelebrationOverlay } from "@/components/CelebrationOverlay";
 import { AdSlot } from "@/components/AdSlot";
 import { useLiveGame } from "@/lib/live";
+import { useRegisterPlayOnMatchEnd } from "@/hooks/use-register-play";
 import {
   joinGame,
   getGameState,
