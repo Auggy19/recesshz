@@ -218,12 +218,14 @@ export default function GamePage() {
     setCelebrationShow(celebrationKind);
   }, [isOver, celebrationKind]);
 
-  useEffect(() => {
-    if (!isOver || status !== "completed") return;
-    if (streakRecordedRef.current) return;
-    streakRecordedRef.current = true;
-    registerPlay();
-  }, [isOver, status, registerPlay]);
+  useRegisterPlayOnMatchEnd({
+  slug,
+  deviceToken,
+  gameType,
+  isOver,
+  celebration: celebrationKind,
+});
+
 
   const handleCopyLink = async () => {
     try {
