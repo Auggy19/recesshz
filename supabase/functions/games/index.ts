@@ -124,6 +124,12 @@ async function expireIfStale(db: SupabaseClient, game: Record<string, unknown>) 
   return false;
 }
 
+async function heartbeat(db: SupabaseClient) {
+  const { error } = await db.from("games").select("id").limit(1);
+  if (error) fail("not_ready", error.message);
+  return { ok: true, ts: Date.now() };
+}
+
 async function createGame(db: SupabaseClient, body: Record<string, unknown>) {
   const gameType = String(body.gameType ?? "");
   const deviceToken = String(body.deviceToken ?? "");
@@ -246,6 +252,7 @@ Deno.serve(async (req) => {
     const db = admin();
     let result: unknown;
     switch (action) {
+      case "heartbeat": result = await heartbeat(db); break;
       case "createGame": result = await createGame(db, body); break;
       case "joinGame": result = await joinGame(db, body); break;
       case "getGameState": result = await getGameState(db, body); break;

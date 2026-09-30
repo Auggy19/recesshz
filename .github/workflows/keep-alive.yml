@@ -1,0 +1,36 @@
+name: Keep Supabase free project active
+
+# Pings the games Edge Function so the Free-plan project sees DB activity
+# at least a few times per week and is less likely to auto-pause.
+# This cannot unpause an already-paused project.
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: mbvajrdpajvzumtxywnt
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Heartbeat
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Add GitHub secret SUPABASE_ANON_KEY (same value as VITE_SUPABASE_ANON_KEY) so keep-alive can run."
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/hb.json -w "%{http_code}" \
+            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/games" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -d '{"action":"heartbeat"}' || true)
+          echo "HTTP $code"
+          cat /tmp/hb.json || true
+          if [ "$code" != "200" ]; then
+            echo "::warning::Heartbeat failed. If the project is paused, Resume it in the Supabase dashboard first."
+            exit 0
+          fi
