@@ -54,12 +54,14 @@ export function SplashSequence() {
       aria-label="Recess opening"
     >
       <div className="recess-splash__stage">
-        <div className="recess-splash__rings" aria-hidden>
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="recess-splash__orb">
+  <div className="recess-splash__rings">
+    <span />
+    <span />
+    <span />
+    <span />
+  </div>
+</div>
+
           <span className="recess-splash__r">R</span>
         </div>
         <p className="recess-splash__word">Recess</p>
