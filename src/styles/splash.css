@@ -1,0 +1,220 @@
+/* Cinematic Recess splash — matches the four-panel board:
+   1 pop, 2 flip, 3 geometric transform, 4 blend into the dark app. */
+
+.recess-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 42%, #1a1208 0%, #050505 62%);
+  color: #fff;
+}
+
+.recess-splash__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.recess-splash__orb {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #ffb43a 0%, #f5a623 55%, #c97a10 100%);
+  box-shadow:
+    0 0 0 1px rgb(255 196 90 / 0.35),
+    0 18px 50px rgb(245 166 35 / 0.45),
+    0 0 80px rgb(245 166 35 / 0.35);
+}
+
+.recess-splash__r {
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 58px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: -0.04em;
+}
+
+.recess-splash__word {
+  margin-top: 22px;
+  font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+  opacity: 0;
+}
+
+.recess-splash__word::first-letter {
+  color: #f5a623;
+}
+
+.recess-splash__rings {
+  position: absolute;
+  inset: -38px;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.recess-splash__rings span {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgb(245 166 35 / 0.45);
+  border-radius: 36px;
+}
+
+.recess-splash__rings span:nth-child(2) {
+  inset: -14px;
+  border-radius: 42px;
+  opacity: 0.55;
+}
+
+.recess-splash__rings span:nth-child(3) {
+  inset: -28px;
+  border-radius: 48px;
+  opacity: 0.28;
+}
+
+/* 1 — icon pops */
+.recess-splash[data-step="pop"] .recess-splash__orb {
+  animation: splash-pop 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 2 — quick flip + motion smear */
+.recess-splash[data-step="flip"] .recess-splash__orb {
+  animation: splash-flip 680ms cubic-bezier(0.4, 0.1, 0.2, 1) both;
+}
+.recess-splash[data-step="flip"] .recess-splash__orb::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 32px;
+  border: 2px solid rgb(255 180 50 / 0.35);
+  filter: blur(1px);
+  animation: splash-smear 680ms ease-out both;
+}
+
+/* 3 — geometric frames */
+.recess-splash[data-step="transform"] .recess-splash__rings {
+  opacity: 1;
+  animation: splash-rings 820ms ease-out both;
+}
+.recess-splash[data-step="transform"] .recess-splash__orb {
+  animation: splash-pulse 820ms ease-in-out both;
+}
+
+/* 4 — blend into the nav */
+.recess-splash[data-step="blend"] {
+  animation: splash-veil 780ms ease-in forwards;
+}
+.recess-splash[data-step="blend"] .recess-splash__orb {
+  animation: splash-dock 780ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.recess-splash[data-step="blend"] .recess-splash__word {
+  animation: splash-word 500ms ease-out 80ms both;
+}
+
+@keyframes splash-pop {
+  0% {
+    transform: scale(0.35);
+    opacity: 0;
+    filter: blur(8px);
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes splash-flip {
+  0% {
+    transform: rotateY(0deg) scale(1);
+  }
+  50% {
+    transform: rotateY(180deg) scale(1.06);
+  }
+  100% {
+    transform: rotateY(360deg) scale(1);
+  }
+}
+
+@keyframes splash-smear {
+  0% {
+    transform: scaleX(1.4) rotate(-18deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scaleX(1) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-rings {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes splash-dock {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-28vw, -38vh) scale(0.28);
+    opacity: 0;
+  }
+}
+
+@keyframes splash-word {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-veil {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recess-splash,
+  .recess-splash * {
+    animation-duration: 1ms !important;
+  }
+}
