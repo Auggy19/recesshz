@@ -13,6 +13,8 @@ const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 const SoloPage = lazy(() => import("./pages/SoloPage.tsx"));
 const TermsPage = lazy(() => import("./pages/TermsPage.tsx"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage.tsx"));
+const AuthPage = lazy(() => import("./pages/Auth.tsx"));
+const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 
 function RouteLoading() {
   return (
@@ -97,7 +99,7 @@ function RouteSyncer() {
         if (event.data.direction === "forward") window.history.forward();
       }
     }
-    window.addEventListener("message", handleMessage);
+    window.addEventListener("message", event);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
@@ -119,6 +121,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/play/:slug" element={<GamePage />} />
               <Route path="/solo/:gameType" element={<SoloPage />} />
               <Route path="/solo" element={<SoloPage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="*" element={<NotFound />} />
