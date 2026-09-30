@@ -99,7 +99,7 @@ function RouteSyncer() {
         if (event.data.direction === "forward") window.history.forward();
       }
     }
-    window.addEventListener("message", event);
+    window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
