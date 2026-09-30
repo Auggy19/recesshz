@@ -1,6 +1,7 @@
 /* DO NOT CHANGE */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/splash.css";
 @custom-variant dark (&:is(.dark *));
 
 /* DO NOT CHANGE */
@@ -43,22 +44,15 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Recess brand fonts — Outfit for display (heavy, geometric, friendly),
-   Plus Jakarta Sans for body/UI. Loaded with display=swap from index.html,
-   so system fallbacks render until the fonts arrive (slow-connection safe). */
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui,
     sans-serif;
-
-  /* Pong court motion (keyframes at the bottom of this file). */
   --animate-recess-bob: recess-bob 2.6s ease-in-out infinite;
   --animate-pong-glow: recess-pong-glow 0.7s ease-in-out infinite;
 }
 
-/* Premium surface shadows — layered (line + ambient + lift) instead of flat.
-   Black-based ones stay quiet on dark surfaces; the amber ones glow in both. */
 @utility shadow-soft {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -10px rgb(0 0 0 / 0.12);
 }
@@ -72,12 +66,10 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 12px 28px -8px rgb(245 166 35 / 0.5);
 }
 @utility shadow-chip {
-  /* Inset top highlight that follows the theme's foreground automatically. */
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 7%, transparent),
     0 1px 2px rgb(0 0 0 / 0.05);
 }
 
-/* CHANGE VALUES FOR THEME — Recess brand: amber #F5A623, ink #1A1A1A, cream #FFF9E5 */
 :root {
   color-scheme: light;
   --radius: 1rem;
@@ -117,37 +109,37 @@
 
 .dark {
   color-scheme: dark;
-  --background: #17130C;
-  --foreground: #F7EFDD;
-  --card: #221C12;
-  --card-foreground: #F7EFDD;
-  --popover: #221C12;
-  --popover-foreground: #F7EFDD;
+  --background: #070707;
+  --foreground: #F4F4F5;
+  --card: #121212;
+  --card-foreground: #F4F4F5;
+  --popover: #121212;
+  --popover-foreground: #F4F4F5;
   --primary: #F5A623;
-  --primary-foreground: #FFFFFF;
-  --primary-deep: #E08F14;
-  --secondary: #2E2719;
-  --secondary-foreground: #F7EFDD;
-  --muted: #2A2315;
-  --muted-foreground: #A7977C;
-  --accent: #332A1A;
-  --accent-foreground: #F7EFDD;
+  --primary-foreground: #0A0A0A;
+  --primary-deep: #C97A10;
+  --secondary: #1A140C;
+  --secondary-foreground: #F4F4F5;
+  --muted: #161616;
+  --muted-foreground: #A1A1AA;
+  --accent: #1C150C;
+  --accent-foreground: #F4F4F5;
   --destructive: #E0604E;
-  --border: #3A3120;
-  --input: #3A3120;
+  --border: #2A2A2A;
+  --input: #2A2A2A;
   --ring: #F5A623;
   --chart-1: #F5A623;
-  --chart-2: #F7EFDD;
+  --chart-2: #F4F4F5;
   --chart-3: #E8A33D;
   --chart-4: #C98A1E;
   --chart-5: #F9C877;
-  --sidebar: #221C12;
-  --sidebar-foreground: #F7EFDD;
+  --sidebar: #0C0C0C;
+  --sidebar-foreground: #F4F4F5;
   --sidebar-primary: #F5A623;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2E2719;
-  --sidebar-accent-foreground: #F7EFDD;
-  --sidebar-border: #3A3120;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #1A140C;
+  --sidebar-accent-foreground: #F4F4F5;
+  --sidebar-border: #2A2A2A;
   --sidebar-ring: #F5A623;
 }
 
@@ -166,67 +158,29 @@
     cursor: pointer;
   }
 
-  /* Subtle film grain over everything — gives solid fills texture instead of
-     flat poster color. Pointer-events-none so it never blocks interaction. */
   body::after {
     content: "";
     position: fixed;
     inset: 0;
     z-index: 90;
     pointer-events: none;
-    opacity: 0.035;
+    opacity: 0.028;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   ::selection {
     background: color-mix(in srgb, var(--primary) 30%, transparent);
   }
-
-  /* Refined scrollbar (WebKit) — quiet, thin, brand-tinted on hover. */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--foreground) 16%, transparent);
-    border-radius: 999px;
-    border: 3px solid transparent;
-    background-clip: padding-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--primary) 55%, transparent);
-    border: 3px solid transparent;
-    background-clip: padding-box;
-  }
 }
 
-/* ---------------------------------------------------------------------------
-   Pong court motion — the ball's left/right travel is the game's heartbeat,
-   so it needs to read clearly even on slow polling connections.
-   - recess-bob:      gentle idle bob while the ball waits to be served, so
-                      the court never looks frozen between points.
-   - recess-pong-glow: fast amber pulse while a shot is in flight, so the eye
-                      tracks the ball across the court.
---------------------------------------------------------------------------- */
 @keyframes recess-bob {
   0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-3px);
-  }
+  100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @keyframes recess-pong-glow {
   0%,
-  100% {
-    box-shadow: 0 2px 14px rgba(245, 166, 35, 0.6);
-  }
-  50% {
-    box-shadow: 0 2px 28px rgba(245, 166, 35, 1);
-  }
+  100% { box-shadow: 0 2px 14px rgba(245, 166, 35, 0.6); }
+  50% { box-shadow: 0 2px 28px rgba(245, 166, 35, 1); }
 }
