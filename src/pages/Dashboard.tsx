@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { LayoutDashboard, LogOut } from "lucide-react";
 import { useNavigate } from "react-router";
+import "../styles/dashboard.css";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
