@@ -17,22 +17,17 @@ export default function Dashboard() {
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              Authenticated workspace
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">
-              Welcome{user?.name ? `, ${user.name}` : ""}
-            </h1>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="cursor-pointer gap-2 self-start"
-            onClick={handleSignOut}
-          >
-            <LogOut className="size-4" />
-            Sign out
+          <header className="dashboard-header">
+  <div className="search-container">
+    <input type="text" placeholder="Find hangouts, groups..." className="search-bar" />
+  </div>
+  <nav className="filter-pills">
+    <button className="pill active">Groups</button>
+    <button className="pill">Events</button>
+    <button className="pill">Clubs</button>
+  </nav>
+</header>
+
           </Button>
         </header>
 
