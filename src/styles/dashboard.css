@@ -54,3 +54,66 @@
   border-color: #f5a623;
   color: #000;
 }
+.dashboard-grid {
+  margin-top: 32px;
+  width: 100%;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 16px;
+  letter-spacing: 0.02em;
+}
+
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.activity-card:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(245, 166, 35, 0.1);
+  border-radius: 12px;
+  font-size: 1.5rem;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.card-description {
+  color: #888;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
