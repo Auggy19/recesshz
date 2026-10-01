@@ -1,3 +1,4 @@
+import { CoinsSoon } from "@/components/CoinsSoon";
 import { useDeviceToken } from "@/hooks/use-device-token";
 import { useStreak } from "@/hooks/use-streak";
 import { createGame } from "@/lib/games-api";
@@ -284,6 +285,7 @@ export default function Landing() {
                 </div>
               </div>
             ))}
+            <CoinsSoon />
           </div>
         </section>
       )}
