@@ -17,19 +17,15 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <header className="dashboard-header">
-  <div className="search-container">
-    <input type="text" placeholder="Find hangouts, groups..." className="search-bar" />
-  </div>
-  <nav className="filter-pills">
-    <button className="pill active">Groups</button>
-    <button className="pill">Events</button>
-    <button className="pill">Clubs</button>
-  </nav>
+        <div className="dashboard-header">
+            <h1 className="text-3xl font-bold tracking-tight text-white">Dashboard</h1>
+            <p className="mt-2 text-sm text-zinc-400">Manage groups, events, and clubs.</p>
+          </div>
+        </header>
+
+        <Card className="border-border/70 shadow-none">
           <CardHeader>
-            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <LayoutDashboard className="size-5" />
+
             <div className="dashboard-grid">
   <div className="section-title">Active Recess</div>
   <div className="cards-container">
