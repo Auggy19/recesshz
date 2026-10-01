@@ -61,10 +61,11 @@ export function SplashSequence() {
     <span />
   </div>
 </div>
+<div className="recess-splash__orb">
+  <span className="recess-splash__r">R</span>
+</div>
+<p className="recess-splash__word">Recess</p>
 
-          <span className="recess-splash__r">R</span>
-        </div>
-        <p className="recess-splash__word">Recess</p>
       </div>
     </div>
   );
