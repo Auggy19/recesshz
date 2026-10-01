@@ -66,9 +66,9 @@ export function SplashSequence() {
 </div>
 <p className="recess-splash__word">Recess</p>
 
-  </div>
+    </div>
+</div>
 );
-
 
   );
 }
