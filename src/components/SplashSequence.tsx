@@ -64,7 +64,8 @@ export function SplashSequence() {
 <div className="recess-splash__orb">
   <span className="recess-splash__r">R</span>
 </div>
-<p className="recess-splash__word">Recess</p>
+<p className="recess-splash__tagline">Silence is safe here</p>
+
 
     </div>
 </div>
