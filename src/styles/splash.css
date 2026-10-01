@@ -61,6 +61,16 @@
   color: #f5a623;
 }
 
+.recess-splash__tagline {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  animation: recess-fade-in 400ms ease-out forwards;
+  animation-delay: 400ms;
+}
+
 .recess-splash__rings {
   position: absolute;
   inset: -38px;
