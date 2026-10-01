@@ -28,11 +28,8 @@ export default function Dashboard() {
     <button className="pill">Clubs</button>
   </nav>
 </header>
-
-          </Button>
         </header>
-
-        <Card className="border-border/70 shadow-none">
+Card className="border-border/70 shadow-none">
           <CardHeader>
             <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <LayoutDashboard className="size-5" />
