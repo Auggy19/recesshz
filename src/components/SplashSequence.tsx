@@ -68,3 +68,4 @@ export function SplashSequence() {
         </div>
       </div>
   );
+}
