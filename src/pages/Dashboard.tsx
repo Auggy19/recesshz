@@ -36,15 +36,19 @@ export default function Dashboard() {
           <CardHeader>
             <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <LayoutDashboard className="size-5" />
-            </div>
-            <CardTitle>Your dashboard is ready</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">
-            Replace this starter content with the product&apos;s authenticated
-            experience. The route is protected and sign-in returns here by
-            default.
-          </CardContent>
-        </Card>
+            <div className="dashboard-grid">
+  <div className="section-title">Active Recess</div>
+  <div className="cards-container">
+    <div className="activity-card">
+      <div className="card-icon">🎮</div>
+      <div className="card-info">
+        <h3 className="card-title">Quick Tic Tac Toe</h3>
+        <p className="card-description">A short game between messages. Start a room or practice solo.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
       </div>
     </main>
   );
