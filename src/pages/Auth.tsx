@@ -196,7 +196,8 @@ function Auth({ redirectAfterAuth }: AuthProps) {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full"
+                      handleGoogleLogin
+
                       onClick={handleGoogleLogin}
                       disabled={isLoadingState}
                     >
