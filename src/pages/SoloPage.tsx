@@ -21,6 +21,7 @@ import { AdSlot } from "@/components/AdSlot";
 import { CelebrationOverlay } from "@/components/CelebrationOverlay";
 import { ArcadePong } from "@/components/games/ArcadePong";
 import { SoloTruthOrDare } from "@/components/games/SoloTruthOrDare";
+import { DontBlink } from "@/components/games/DontBlink";
 
 export default function SoloPage() {
   const { gameType = "tic_tac_toe" } = useParams<{ gameType: string }>();
@@ -35,12 +36,13 @@ export default function SoloPage() {
   const [soundOn, setSoundOn] = useState(() => !isSfxMuted());
 
   const isTod = gameType === "truth_or_dare" || gameType === "truth-or-dare";
-  const supported = supportsSinglePlayer(gameType) || isTod;
+  const isBlink = gameType === "dont_blink" || gameType === "dont-blink";
+  const supported = supportsSinglePlayer(gameType) || isTod || isBlink;
   const ttt = useSinglePlayerTicTacToe(difficulty);
   const rps = useSinglePlayerRps(difficulty);
   const rb = useSinglePlayerRedBlack(difficulty);
 
-  const title = entry?.name ?? "Solo";
+  const title = entry?.name ?? (isBlink ? "Don't Blink" : "Solo");
 
   const celebrationKind = useMemo(() => {
     if (gameType === "tic_tac_toe") {
@@ -79,15 +81,18 @@ export default function SoloPage() {
     if (gameType === "pong") {
       return "Arcade Pong · first to 7";
     }
+    if (isBlink) return "Hold Watch · lights freeze the dark";
     if (isTod) return "Pass the phone · no score kept";
     return null;
-  }, [gameType, ttt, rps, rb, isTod]);
+  }, [gameType, ttt, rps, rb, isTod, isBlink]);
 
   const onReset = () => {
     if (gameType === "tic_tac_toe") ttt.reset();
     if (gameType === "rock_paper_scissors") rps.reset();
     if (gameType === "red_or_black") rb.reset();
   };
+
+  const showDifficulty = !isTod && !isBlink && gameType !== "pong";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -125,18 +130,18 @@ export default function SoloPage() {
           <div>
             <h1 className="font-display text-2xl font-black tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">
-              {isTod ? "Solo · pass the phone" : "Solo · vs AI"}
+              {isBlink ? "Solo · puzzle escape" : isTod ? "Solo · pass the phone" : "Solo · vs AI"}
             </p>
           </div>
         </div>
 
         {!supported ? (
           <p className="mt-8 rounded-2xl border border-dashed border-border bg-card/60 p-5 text-sm text-muted-foreground">
-            Solo mode isn't available for this game yet. Try Tic Tac Toe, RPS, Red or Black, Pong, or Truth or Dare.
+            Solo mode isn't available for this game yet.
           </p>
         ) : (
           <>
-            {!isTod && (
+            {showDifficulty && (
               <>
                 <div className="mt-6 flex flex-wrap gap-2">
                   {(Object.keys(DIFFICULTY_LABELS) as Difficulty[]).map((d) => (
@@ -164,7 +169,7 @@ export default function SoloPage() {
 
             <div className="mt-6 mb-2 flex items-center justify-between text-sm font-semibold">
               <span>{status}</span>
-              {gameType !== "pong" && !isTod && (
+              {gameType !== "pong" && !isTod && !isBlink && (
                 <button
                   type="button"
                   onClick={onReset}
@@ -257,6 +262,8 @@ export default function SoloPage() {
             )}
 
             {isTod && <SoloTruthOrDare />}
+
+            {isBlink && <DontBlink />}
 
             <div className="mt-10">
               <AdSlot slot="post_match" gameType={gameType} />
