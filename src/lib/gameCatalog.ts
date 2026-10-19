@@ -22,6 +22,7 @@ import {
   freshCountersBallState,
 } from "@/lib/gameLogic";
 import { TRUTH_OR_DARE_GAME_TYPE, freshTruthOrDareState } from "@/lib/truthOrDare";
+import { DONT_BLINK_GAME_TYPE, freshDontBlinkState } from "@/lib/dontBlink";
 
 export type SupportedGameType =
   | typeof GAME_TYPE
@@ -32,9 +33,9 @@ export type SupportedGameType =
   | typeof HANGMAN_GAME_TYPE
   | typeof WORD_SCRAMBLE_GAME_TYPE
   | typeof COUNTERS_BALL_GAME_TYPE
-  | typeof TRUTH_OR_DARE_GAME_TYPE;
+  | typeof TRUTH_OR_DARE_GAME_TYPE
+  | typeof DONT_BLINK_GAME_TYPE;
 
-/** Visual token for cards, chips, and icons. */
 export type GameAccent =
   | "amber"
   | "sky"
@@ -54,7 +55,8 @@ export type GameIconId =
   | "scramble"
   | "ball"
   | "spark"
-  | "flame";
+  | "flame"
+  | "eye";
 
 export type GameCatalogEntry = {
   type: SupportedGameType;
@@ -115,6 +117,18 @@ export const GAME_CATALOG: readonly GameCatalogEntry[] = [
     icon: "paddle",
     accent: "emerald",
     supportsLive: true,
+    available: true,
+  },
+  {
+    type: DONT_BLINK_GAME_TYPE,
+    slug: "dont-blink",
+    name: "Don't Blink",
+    shortName: "Don't Blink",
+    blurb:
+      "Monsters only move when you look away. Hold Watch, flip the lamps, grab the keys, and reach the exit before the timer ends.",
+    icon: "eye",
+    accent: "violet",
+    supportsLive: false,
     available: true,
   },
   {
@@ -220,6 +234,11 @@ export function urlGameToType(raw: string | null): SupportedGameType | null {
     case "truth-or-dare":
     case "truth_or_dare":
       return TRUTH_OR_DARE_GAME_TYPE;
+    case "dontblink":
+    case "dont-blink":
+    case "dont_blink":
+    case "blink":
+      return DONT_BLINK_GAME_TYPE;
     default:
       return null;
   }
@@ -249,12 +268,13 @@ export function freshStateFor(gameType: string): unknown {
       return freshWordScrambleState();
     case TRUTH_OR_DARE_GAME_TYPE:
       return freshTruthOrDareState();
+    case DONT_BLINK_GAME_TYPE:
+      return freshDontBlinkState();
     default:
       return null;
   }
 }
 
-/** High-contrast gradient tiles for professional icon visibility. */
 export const ACCENT_CLASSES: Record<
   GameAccent,
   { tile: string; text: string; ring: string; soft: string }
