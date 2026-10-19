@@ -18,7 +18,6 @@ const SIZE: Record<Size, { box: string }> = {
   lg: { box: "size-14 rounded-[1.15rem]" },
 };
 
-/** Stylized single-path silhouettes — high visibility at small sizes. */
 function Silhouette({ id }: { id: GameIconId }) {
   switch (id) {
     case "grid":
@@ -86,6 +85,13 @@ function Silhouette({ id }: { id: GameIconId }) {
           <rect x="3.5" y="7" width="7" height="7" rx="1.2" />
           <rect x="13.5" y="7" width="7" height="7" rx="1.2" opacity="0.55" />
           <rect x="8.5" y="12.5" width="7" height="7" rx="1.2" opacity="0.85" />
+        </g>
+      );
+    case "eye":
+      return (
+        <g fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+          <path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12z" />
+          <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
         </g>
       );
     default:
