@@ -1,10 +1,14 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, Logout } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
-
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { useNavigate } from "react-router";
 
 import "../styles/dashboard.css";
 
@@ -22,8 +26,12 @@ export default function Dashboard() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
         <header className="flex flex-col gap-1">
           <div className="dashboard-header">
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.email}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Manage your gaming rooms and track your stats.</p>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Welcome back, {user?.email}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Manage your gaming rooms and track your stats.
+            </p>
           </div>
         </header>
 
@@ -52,7 +60,7 @@ export default function Dashboard() {
               onClick={handleSignOut}
               className="mt-4 flex items-center gap-2"
             >
-              <Logout size={16} />
+              <LogOut size={16} />
               Sign out
             </Button>
           </CardContent>
