@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Camera,
-  Eye,
-  EyeOff,
-  Shield,
-  Skull,
-  RotateCcw,
-} from "lucide-react";
+import { Camera, Eye, EyeOff, Shield, Skull, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   BlinkDetector,
@@ -22,15 +15,18 @@ import {
 } from "@/lib/horrorAudio";
 import { cn } from "@/lib/utils";
 
-type Phase = "gate" | "calibrate" | "play" | "win" | "lose";
+type Phase = "gate" | "play" | "win" | "lose";
 
 const SURVIVE_S = 45;
 const MAX_PROXIMITY = 100;
 const LUNGE = 12;
 
+/**
+ * Manual-first horror survival. Camera blink is optional and never blocks play.
+ * We never claim camera/AI success unless start() reports it.
+ */
 export function DontBlink() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const detectorRef = useRef<BlinkDetector | null>(null);
   const [phase, setPhase] = useState<Phase>("gate");
   const [status, setStatus] = useState<BlinkDetectorStatus>("idle");
@@ -45,10 +41,14 @@ export function DontBlink() {
   const [camMode, setCamMode] = useState(false);
   const [landmarkerOk, setLandmarkerOk] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [log, setLog] = useState<string>("Ready. Play works without a camera.");
 
   const stopCam = useCallback(() => {
-    detectorRef.current?.stop();
+    try {
+      detectorRef.current?.stop();
+    } catch {
+      /* */
+    }
     detectorRef.current = null;
     setCamMode(false);
     setLandmarkerOk(false);
@@ -61,7 +61,7 @@ export function DontBlink() {
     try {
       sfxBlinkLunge();
     } catch {
-      /* audio may be blocked until gesture */
+      /* */
     }
     setShake(true);
     setFlicker(true);
@@ -76,34 +76,39 @@ export function DontBlink() {
           /* */
         }
         setPhase("lose");
-        detectorRef.current?.stop();
-        detectorRef.current = null;
-        setCamMode(false);
-        setLandmarkerOk(false);
+        stopCam();
       }
       return next;
     });
-  }, []);
+  }, [stopCam]);
 
-  /** Full camera retry: stop tracks, then request again. */
+  const startManualPlay = () => {
+    stopCam();
+    setProximity(8);
+    setTimeLeft(SURVIVE_S);
+    setBlinkCount(0);
+    setPhase("play");
+    setLog("Manual mode — tap Blink to lunge the monster.");
+    try {
+      sfxBreath();
+    } catch {
+      /* */
+    }
+  };
+
   const startCamera = async () => {
     setBusy(true);
-    setError(null);
+    setLog("Requesting camera…");
     setStatus("loading");
     setStatusDetail("Requesting camera…");
 
-    // Ensure previous session is fully released (required for iOS retry)
-    detectorRef.current?.stop();
-    detectorRef.current = null;
-
-    // Wait a tick so video is painted (not display:none) before getUserMedia
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    stopCam();
+    await new Promise((r) => setTimeout(r, 50));
 
     const video = videoRef.current;
     if (!video) {
-      setError("Video preview element missing. Use Manual blink.");
+      setLog("ERROR: video element missing. Use Play without camera.");
       setBusy(false);
-      setPhase("gate");
       return;
     }
 
@@ -120,60 +125,66 @@ export function DontBlink() {
     });
     detectorRef.current = det;
 
-    try {
-      const result = await det.start(video);
-      setCamMode(result.camera);
-      setLandmarkerOk(result.landmarker);
-      if (!result.camera) {
-        setError("Camera did not start. Use Manual blink.");
-        setPhase("gate");
-      } else if (!result.landmarker) {
-        setError(
-          "Camera is on, but blink detection could not load. Play with Manual blink — or try camera again after a reload.",
-        );
-        setPhase("calibrate");
-      } else {
-        setError(null);
-        setPhase("calibrate");
+    // Hard timeout so the button never sits forever on "Requesting…"
+    const timeoutMs = 12000;
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      setLog(
+        "Camera request timed out (12s). On iPhone open this page as a top-level tab (not Preview). Or Play without camera.",
+      );
+      setBusy(false);
+      try {
+        det.stop();
+      } catch {
+        /* */
       }
-    } catch (e) {
-      const msg = cameraErrorMessage(e);
-      setError(msg);
+      detectorRef.current = null;
       setCamMode(false);
       setLandmarkerOk(false);
-      setPhase("gate");
-      det.stop();
+    }, timeoutMs);
+
+    try {
+      const result = await det.start(video);
+      if (timedOut) return;
+      window.clearTimeout(timer);
+      setCamMode(result.camera);
+      setLandmarkerOk(result.landmarker);
+      if (result.camera && result.landmarker) {
+        setLog("Camera + blink detection active (on-device). Survive 45s.");
+        setProximity(8);
+        setTimeLeft(SURVIVE_S);
+        setBlinkCount(0);
+        setPhase("play");
+      } else if (result.camera && !result.landmarker) {
+        setLog(
+          "Camera opened, but blink AI failed to load. Use the Blink button.",
+        );
+        setProximity(8);
+        setTimeLeft(SURVIVE_S);
+        setBlinkCount(0);
+        setPhase("play");
+      } else {
+        setLog("Camera did not start. Use Play without camera.");
+      }
+    } catch (e) {
+      if (timedOut) return;
+      window.clearTimeout(timer);
+      const msg = cameraErrorMessage(e);
+      setLog(`Camera failed: ${msg}`);
+      setCamMode(false);
+      setLandmarkerOk(false);
+      try {
+        det.stop();
+      } catch {
+        /* */
+      }
       detectorRef.current = null;
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const startManual = () => {
-    stopCam();
-    setError(null);
-    setProximity(8);
-    setTimeLeft(SURVIVE_S);
-    setBlinkCount(0);
-    setCamMode(false);
-    setLandmarkerOk(false);
-    setPhase("play");
-    try {
-      sfxBreath();
-    } catch {
-      /* */
-    }
-  };
-
-  const beginPlay = () => {
-    setProximity(8);
-    setTimeLeft(SURVIVE_S);
-    setBlinkCount(0);
-    setPhase("play");
-    try {
-      sfxBreath();
-    } catch {
-      /* */
+      if (!timedOut) {
+        window.clearTimeout(timer);
+        setBusy(false);
+      }
     }
   };
 
@@ -183,23 +194,20 @@ export function DontBlink() {
       setTimeLeft((t) => {
         if (t <= 1) {
           setPhase("win");
-          detectorRef.current?.stop();
-          detectorRef.current = null;
-          setCamMode(false);
+          stopCam();
           return 0;
         }
         return t - 1;
       });
       try {
-        if (Math.random() < 0.12) sfxFootstep();
-        if (Math.random() < 0.06) sfxWhisper();
-        if (Math.random() < 0.08) sfxBreath();
+        if (Math.random() < 0.1) sfxFootstep();
+        if (Math.random() < 0.05) sfxWhisper();
       } catch {
         /* */
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [phase]);
+  }, [phase, stopCam]);
 
   useEffect(() => {
     if (phase !== "play" || !camMode || !landmarkerOk) return;
@@ -214,140 +222,80 @@ export function DontBlink() {
             /* */
           }
           setPhase("lose");
-          detectorRef.current?.stop();
-          detectorRef.current = null;
-          setCamMode(false);
+          stopCam();
         }
         return next;
       });
     }, 800);
     return () => window.clearInterval(id);
-  }, [phase, camMode, landmarkerOk, status]);
+  }, [phase, camMode, landmarkerOk, status, stopCam]);
 
   const monsterScale = 0.35 + (proximity / MAX_PROXIMITY) * 1.4;
   const aggression = proximity / MAX_PROXIMITY;
 
   return (
     <div className="space-y-3">
-      {/* Always in DOM — opacity, not display:none — so iOS accepts getUserMedia */}
       <video
         ref={videoRef}
         className={cn(
           "mx-auto rounded-xl border border-border object-cover bg-black",
-          camMode && phase !== "gate"
-            ? "h-28 w-40"
-            : "h-px w-px opacity-0 overflow-hidden absolute pointer-events-none",
+          camMode ? "h-28 w-40" : "pointer-events-none absolute h-px w-px opacity-0",
         )}
         playsInline
         muted
         autoPlay
-        // @ts-expect-error webkit prop for older iOS
-        webkit-playsinline="true"
         style={{ transform: "scaleX(-1)" }}
       />
 
       {phase === "gate" && (
-        <div className="rounded-2xl border border-violet-500/30 bg-zinc-950 p-4 text-sm text-zinc-200 space-y-3">
+        <div className="space-y-3 rounded-2xl border border-violet-500/30 bg-zinc-950 p-4 text-sm text-zinc-200">
           <p className="font-display text-lg font-black text-violet-200">
             Don't Blink
           </p>
-          <p className="text-zinc-400 leading-relaxed">
-            Something in the dark only moves when your eyes close. Camera frames
-            are processed <strong className="text-zinc-200">on this phone</strong> —
-            not recorded, not uploaded.
+          <p className="leading-relaxed text-zinc-400">
+            Survive {SURVIVE_S}s. Each blink lunges the thing in the dark. Camera
+            blink detection is optional — play works without it.
           </p>
-          <ul className="list-disc pl-5 text-xs text-zinc-500 space-y-1">
-            <li>Open the live site URL (not an embedded Preview iframe) for camera</li>
-            <li>Allow Camera for this site in iOS Settings if prompted</li>
-            <li>Or play immediately with Manual blink — same monster rules</li>
-          </ul>
-          {error && (
-            <p className="rounded-xl border border-rose-500/40 bg-rose-950/50 px-3 py-2 text-xs text-rose-200 whitespace-pre-wrap">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-col gap-2">
-            <Button
-              className="rounded-full font-bold w-full"
-              disabled={busy}
-              onClick={() => void startCamera()}
-            >
-              <Camera className="size-4" />
-              {busy ? "Requesting…" : error ? "Try camera again" : "Enable camera"}
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-full font-bold w-full"
-              disabled={busy}
-              onClick={startManual}
-            >
-              <EyeOff className="size-4" />
-              Manual blink — play now
-            </Button>
-          </div>
-          <p className="text-[11px] text-zinc-600 flex items-center gap-1">
-            <Shield className="size-3" /> We never claim the camera worked if it failed
+          <p className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300">
+            {log}
           </p>
-        </div>
-      )}
-
-      {phase === "calibrate" && (
-        <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-          <p className="text-sm font-semibold">Calibration</p>
-          {landmarkerOk ? (
-            <>
-              <p className="text-xs text-muted-foreground">
-                Keep eyes open. Blink once — the bar should dip, then recover.
-              </p>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-violet-500 transition-all"
-                  style={{ width: `${Math.min(100, ear * 280)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {status}
-                {statusDetail ? ` · ${statusDetail}` : ""}
-                {eyesClosed ? " · eyes closed" : " · eyes open"}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-amber-600 dark:text-amber-300">
-              Camera preview may work, but automatic blink detection is not
-              running. Use Manual blink in-game.
-            </p>
-          )}
-          <Button className="rounded-full font-bold w-full" onClick={beginPlay}>
-            Start survival
+          <Button
+            type="button"
+            className="w-full rounded-full font-bold"
+            onClick={startManualPlay}
+          >
+            <EyeOff className="size-4" />
+            Play without camera
           </Button>
           <Button
+            type="button"
             variant="outline"
-            className="w-full rounded-full text-xs"
-            onClick={() => void startCamera()}
+            className="w-full rounded-full font-bold"
             disabled={busy}
+            onClick={() => void startCamera()}
           >
-            Try camera again
+            <Camera className="size-4" />
+            {busy ? "Requesting camera…" : "Try camera blink"}
           </Button>
-          <Button variant="ghost" className="w-full text-xs" onClick={startManual}>
-            Switch to manual blink
-          </Button>
+          <p className="flex items-center gap-1 text-[11px] text-zinc-600">
+            <Shield className="size-3" />
+            Frames stay on device if camera works. No upload.
+          </p>
         </div>
       )}
 
       {(phase === "play" || phase === "win" || phase === "lose") && (
         <>
           <div className="flex justify-between text-xs font-semibold tabular-nums">
-            <span>{Math.ceil(timeLeft)}s left</span>
+            <span>{Math.ceil(timeLeft)}s</span>
             <span>Blinks {blinkCount}</span>
             <span className={aggression > 0.7 ? "text-rose-500" : ""}>
-              {Math.round(proximity)}% close
+              {Math.round(proximity)}%
             </span>
           </div>
+          <p className="text-[11px] text-muted-foreground">{log}</p>
 
-          {/* Play stage — DOM/SVG (not a canvas). Preview tools looking for
-              <canvas> were wrong for this game; stage is this div. */}
           <div
-            ref={stageRef}
             data-dont-blink-stage="true"
             className={cn(
               "relative mx-auto aspect-[4/5] w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-800 bg-black",
@@ -360,12 +308,7 @@ export function DontBlink() {
               style={{
                 background:
                   "radial-gradient(ellipse at 50% 70%, #1a0a12 0%, #000 55%)",
-                filter: flicker ? "contrast(1.4) brightness(1.2)" : undefined,
               }}
-            />
-            <div
-              className="absolute top-3 right-4 h-8 w-5 rounded-sm border border-emerald-700/30 bg-emerald-900/40"
-              style={{ opacity: 0.3 + (1 - aggression) * 0.4 }}
             />
             <div
               className="absolute bottom-[12%] left-1/2 origin-bottom transition-transform duration-150"
@@ -375,7 +318,7 @@ export function DontBlink() {
             >
               <MonsterSvg aggression={aggression} />
             </div>
-            {eyesClosed && camMode && landmarkerOk && (
+            {eyesClosed && landmarkerOk && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-bold text-rose-300">
                 EYES CLOSED
               </div>
@@ -384,65 +327,47 @@ export function DontBlink() {
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 text-rose-400">
                 <Skull className="mb-2 size-12" />
                 <p className="font-display text-xl font-black">IT SAW YOU</p>
-                <p className="mt-1 text-xs text-zinc-500">Too close after a blink.</p>
               </div>
             )}
             {phase === "win" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-emerald-300">
                 <p className="font-display text-xl font-black">You held the gaze</p>
-                <p className="mt-1 text-xs text-zinc-500">Exit found in the dark.</p>
               </div>
             )}
           </div>
 
           {phase === "play" && (
-            <div className="flex flex-col gap-2">
-              {/* Manual always available so a failed landmarker never soft-locks */}
-              <Button
-                className="w-full rounded-full font-bold"
-                variant="destructive"
-                onClick={() => onBlink()}
-              >
-                <Eye className="size-4" />
-                Blink
-                {landmarkerOk && camMode ? " (or close your eyes)" : " (manual)"}
-              </Button>
-              {camMode && landmarkerOk ? (
-                <p className="text-center text-[11px] text-muted-foreground">
-                  {status === "no_face"
-                    ? "Face lost — it creeps while you're gone"
-                    : "Real blinks count · frames stay local"}
-                </p>
-              ) : (
-                <p className="text-center text-[11px] text-muted-foreground">
-                  Manual mode — each Blink lunges the monster
-                </p>
-              )}
-            </div>
+            <Button
+              type="button"
+              className="w-full rounded-full font-bold"
+              variant="destructive"
+              onClick={() => onBlink()}
+            >
+              <Eye className="size-4" />
+              Blink
+            </Button>
           )}
 
           {(phase === "win" || phase === "lose") && (
-            <div className="flex flex-col gap-2">
-              <Button
-                className="w-full rounded-full font-bold"
-                onClick={() => {
-                  stopCam();
-                  setPhase("gate");
-                  setProximity(8);
-                  setError(null);
-                }}
-              >
-                <RotateCcw className="size-4" />
-                Back to start
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full rounded-full font-bold"
-                onClick={startManual}
-              >
-                Play again (manual)
-              </Button>
-            </div>
+            <Button
+              type="button"
+              className="w-full rounded-full font-bold"
+              onClick={() => {
+                stopCam();
+                setPhase("gate");
+                setLog("Ready. Play works without a camera.");
+              }}
+            >
+              <RotateCcw className="size-4" />
+              Again
+            </Button>
+          )}
+
+          {phase === "play" && camMode && (
+            <p className="text-center text-[11px] text-muted-foreground">
+              EAR {ear.toFixed(2)}
+              {statusDetail ? ` · ${statusDetail}` : ""}
+            </p>
           )}
         </>
       )}
@@ -453,25 +378,13 @@ export function DontBlink() {
 function MonsterSvg({ aggression }: { aggression: number }) {
   const eyes = 3 + Math.floor(aggression * 4);
   return (
-    <svg
-      width="160"
-      height="200"
-      viewBox="0 0 160 200"
-      className="drop-shadow-[0_0_20px_rgba(120,0,40,0.6)]"
-      aria-hidden
-    >
+    <svg width="160" height="200" viewBox="0 0 160 200" aria-hidden>
       <ellipse
         cx="80"
         cy="120"
         rx={40 + aggression * 20}
         ry={55 + aggression * 15}
         fill="#1a0508"
-      />
-      <path
-        d={`M40 80 Q80 ${30 - aggression * 20} 120 80`}
-        stroke="#2a0a10"
-        strokeWidth="12"
-        fill="none"
       />
       {Array.from({ length: eyes }).map((_, i) => {
         const a = (i / eyes) * Math.PI - Math.PI / 2;
@@ -484,12 +397,6 @@ function MonsterSvg({ aggression }: { aggression: number }) {
           </g>
         );
       })}
-      <path
-        d={`M55 ${140 + aggression * 10} Q80 ${155 + aggression * 20} 105 ${140 + aggression * 10}`}
-        stroke="#4a1020"
-        strokeWidth="3"
-        fill="none"
-      />
       <line x1="30" y1="160" x2="10" y2="200" stroke="#2a1018" strokeWidth="6" />
       <line x1="130" y1="160" x2="150" y2="200" stroke="#2a1018" strokeWidth="6" />
     </svg>

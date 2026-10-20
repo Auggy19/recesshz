@@ -23,8 +23,14 @@ import { ArcadePong } from "@/components/games/ArcadePong";
 import { SoloTruthOrDare } from "@/components/games/SoloTruthOrDare";
 import { DontBlink } from "@/components/games/DontBlink";
 
+/** Normalize URL param: dont-blink and dont_blink both work. */
+function normalizeGameType(raw: string | undefined): string {
+  return (raw ?? "tic_tac_toe").trim().toLowerCase().replace(/-/g, "_");
+}
+
 export default function SoloPage() {
-  const { gameType = "tic_tac_toe" } = useParams<{ gameType: string }>();
+  const { gameType: rawType } = useParams<{ gameType: string }>();
+  const gameType = normalizeGameType(rawType);
   const [searchParams] = useSearchParams();
   const entry = getGameEntry(gameType);
   const initialDifficulty = ((): Difficulty => {
@@ -35,14 +41,17 @@ export default function SoloPage() {
   const [difficulty, setDifficulty] = useState<Difficulty>(initialDifficulty);
   const [soundOn, setSoundOn] = useState(() => !isSfxMuted());
 
-  const isTod = gameType === "truth_or_dare" || gameType === "truth-or-dare";
-  const isBlink = gameType === "dont_blink" || gameType === "dont-blink";
-  const supported = supportsSinglePlayer(gameType) || isTod || isBlink;
+  const isTod = gameType === "truth_or_dare";
+  const isBlink = gameType === "dont_blink";
+  const supported =
+    supportsSinglePlayer(gameType) || isTod || isBlink || gameType === "dont_blink";
+
   const ttt = useSinglePlayerTicTacToe(difficulty);
   const rps = useSinglePlayerRps(difficulty);
   const rb = useSinglePlayerRedBlack(difficulty);
 
-  const title = entry?.name ?? (isBlink ? "Don't Blink" : "Solo");
+  const title =
+    entry?.name ?? (isBlink ? "Don't Blink" : isTod ? "Truth or Dare" : "Solo");
 
   const celebrationKind = useMemo(() => {
     if (gameType === "tic_tac_toe") {
@@ -78,10 +87,8 @@ export default function SoloPage() {
       if (rb.state.matchWinner === "X") return "House wins the match";
       return `Round ${rb.state.round} · You ${rb.state.scores.O}–${rb.state.scores.X} House`;
     }
-    if (gameType === "pong") {
-      return "Arcade Pong · first to 7";
-    }
-    if (isBlink) return "Hold Watch · lights freeze the dark";
+    if (gameType === "pong") return "Arcade Pong · first to 7";
+    if (isBlink) return "Don't look away";
     if (isTod) return "Pass the phone · no score kept";
     return null;
   }, [gameType, ttt, rps, rb, isTod, isBlink]);
@@ -126,16 +133,26 @@ export default function SoloPage() {
 
       <main className="mx-auto w-full max-w-lg px-5 pb-16">
         <div className="flex items-center gap-3">
-          <GameIcon gameType={gameType} size="md" />
+          <GameIcon gameType={isBlink ? "dont_blink" : gameType} size="md" />
           <div>
             <h1 className="font-display text-2xl font-black tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">
-              {isBlink ? "Solo · puzzle escape" : isTod ? "Solo · pass the phone" : "Solo · vs AI"}
+              {isBlink
+                ? "Solo · psychological horror"
+                : isTod
+                  ? "Solo · pass the phone"
+                  : "Solo · vs AI"}
             </p>
           </div>
         </div>
 
-        {!supported ? (
+        {/* Force-mount DON'T BLINK whenever the URL says so — never hide behind
+            a stale supportsSinglePlayer list on an old deploy. */}
+        {isBlink ? (
+          <div className="mt-6">
+            <DontBlink />
+          </div>
+        ) : !supported ? (
           <p className="mt-8 rounded-2xl border border-dashed border-border bg-card/60 p-5 text-sm text-muted-foreground">
             Solo mode isn't available for this game yet.
           </p>
@@ -163,13 +180,15 @@ export default function SoloPage() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{DIFFICULTY_BLURBS[difficulty]}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {DIFFICULTY_BLURBS[difficulty]}
+                </p>
               </>
             )}
 
             <div className="mt-6 mb-2 flex items-center justify-between text-sm font-semibold">
               <span>{status}</span>
-              {gameType !== "pong" && !isTod && !isBlink && (
+              {gameType !== "pong" && !isTod && (
                 <button
                   type="button"
                   onClick={onReset}
@@ -262,8 +281,6 @@ export default function SoloPage() {
             )}
 
             {isTod && <SoloTruthOrDare />}
-
-            {isBlink && <DontBlink />}
 
             <div className="mt-10">
               <AdSlot slot="post_match" gameType={gameType} />
